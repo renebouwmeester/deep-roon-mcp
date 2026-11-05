@@ -10,7 +10,7 @@ import { officialZone } from '../core/official';
 import { log } from '../core/log';
 import { Any, C, clean, duration, field, imageKey, items, obj, short, wait, trackArtist } from './graph';
 import { findAlbum, findTracks } from './library';
-import { findZone } from './zones';
+import { findZone, zoneNames } from './zones';
 
 export type How = 'now' | 'next' | 'queue';
 // PlayPriority: Now = 0, Interrupt = 1, PlayBefore = 2, Next = 3, Queue = 4.
@@ -358,15 +358,23 @@ export async function cover(zoneName?: string) {
     const al = obj(c, field(tr, 'Album'));
     const url = String(field(obj(c, field(al, 'Image')), 'Url') ?? field(obj(c, field(tr, 'Image')), 'Url') ?? '');
     const key = /^broker:\/\/\/image\/([^.]+)\./.exec(url)?.[1];
-    return { key, title: field(tr, 'Title'), album: field(al, 'Title'), artist: clean(field(al, 'PerformedBy')), zone: pick?.name };
+    return { key, title: field(tr, 'Title'), album: field(al, 'Title'), artist: clean(field(al, 'PerformedBy')), zone: pick?.name ?? zoneNames(c).get(String(z.oid)) };
   });
-  const off = zoneName ? officialZone(zoneName) : undefined;
-  const key = info.key ?? off?.now_playing?.image_key;
+  const off = info.zone ? officialZone(info.zone) : undefined;
+  // The graph's key is an internal one: the Core serves it on /image/<key>.jpg, not on /api/image/, which takes the official
+  // API's keys only (5 Nov 2026, forum report: roon_cover failed whenever the internal protocol was on). The official key first.
+  const urls = [off?.now_playing?.image_key && `/api/image/${off.now_playing.image_key}?scale=fit&width=600&height=600`,
+                info.key && `/image/${info.key}.jpg?scale=fit&width=600&height=600`].filter(Boolean) as string[];
   // A stream into Roon (audio input, radio): no track in the graph — the lines Roon shows instead.
   const lines = off?.now_playing?.three_line;
   if (!info.title && lines?.line1) { info.title = lines.line1; info.artist = lines.line2 ?? ''; info.album = lines.line3; }
-  if (!key) throw new RoonError('Roon has no cover for what plays', 'not_found');
-  const r = await fetch(`http://${t.host}:${t.port}/api/image/${key}?scale=fit&width=600&height=600`).catch(() => null);
+  if (!urls.length) throw new RoonError('Roon has no cover for what plays', 'not_found');
+  let r: Response | null = null;
+  for (const u of urls) {
+    r = await fetch(`http://${t.host}:${t.port}${u}`).catch(() => null);
+    if (r?.ok) break;
+    log(`cover: ${u.split('?')[0]} → ${r ? r.status : 'no answer'}`);
+  }
   if (!r?.ok) throw new RoonError('Roon doesn\'t hand over the cover right now', 'unavailable');
   return { info: { zone: info.zone, title: info.title, album: info.album, artist: info.artist },
            image: { data: Buffer.from(await r.arrayBuffer()).toString('base64'), mimeType: r.headers.get('content-type') ?? 'image/jpeg' } };
