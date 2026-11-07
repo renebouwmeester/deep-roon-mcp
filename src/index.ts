@@ -3,6 +3,7 @@
 // doesn't reach. Nothing leaves the network except what the MCP client sends to its model.
 //
 //   ROON_HOST=<address>[:port]   the Core, when it can't be found on the network (another subnet, a VPN)
+//   ROON_PROFILE=<name>          the Roon profile to use (history, Home, favourites, Listen Later); empty = the first
 //   DEEP_ROON_HTTP=[host:]port   serve MCP over HTTP (Streamable HTTP, stateless, POST /mcp) instead of stdio — for a
 //                                client that can't start a local process. No authentication: keep it on 127.0.0.1 (the
 //                                default host) or behind something that has it.

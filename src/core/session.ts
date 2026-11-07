@@ -4,6 +4,7 @@
 //
 // Objects are only valid within one connection; the ids (AlbumId, TrackId, PerformerId) aren't — an id from an earlier
 // connection is fetched from the Core again (see roon/library.ts).
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { RoonClient } from '../intern';
 import { brokerId, coreInfo, findCores } from './discover';
 import { RoonError, Target } from './errors';
@@ -22,6 +23,33 @@ let queue: Promise<unknown> = Promise.resolve();
 /** Runs once, after the first connection (the self-test, set by index.ts). */
 let onFirstConnect: (() => Promise<void>) | null = null;
 export function afterFirstConnect(f: () => Promise<void>): void { onFirstConnect = f; }
+// The Roon profile (7 Nov 2026, forum: "after switching profiles in Roon, roon_history still returns the history of my
+// first profile"). Each Roon app is a remote with its own profile; so is Deep Roon. ROON_PROFILE (a name) chooses it
+// for everything; a tool's `profile` argument for one question — carried through the call's awaits by
+// AsyncLocalStorage, so a function that waits, or opens a fresh connection (the history), keeps it. Neither: the first.
+const asked = new AsyncLocalStorage<string>();
+export function asProfile<T>(name: string | undefined, work: () => Promise<T>): Promise<T> { return name?.trim() ? asked.run(name.trim(), work) : work(); }
+let wanted: string | undefined;
+/** The profiles the Core sends with the graph, in its own order: name and id. */
+export function profilesOf(c: RoonClient): { name: string; id: Buffer }[] {
+  const list = [...c.graph.objects.values()].find((o) => /\.DataList<[\w.]*\.Profile>$/.test(o.typeName));
+  const objs = list ? ((list.fields.$items as { $ref: bigint }[] | undefined) ?? []).map((r) => c.graph.getObject(r.$ref)) : [...c.graph.objects.values()].filter((o) => o.typeName.endsWith('.Profile'));
+  const field = (o: { fields: Record<string, unknown> }, n: string) => Object.entries(o.fields).find(([k]) => k.endsWith(`::${n}`) || k === n)?.[1];
+  return objs.filter(Boolean).map((o) => ({ name: String(field(o!, 'Name') ?? ''), id: field(o!, 'ProfileId') as Buffer })).filter((p) => p.name && Buffer.isBuffer(p.id));
+}
+function chooseProfile(c: RoonClient): void {
+  const name = wanted ?? (process.env.ROON_PROFILE?.trim() || undefined);
+  if (!name) { c.useProfile(undefined); return; }
+  const all = profilesOf(c), p = all.find((x) => x.name.toLowerCase() === name.toLowerCase());
+  if (!p) throw new RoonError(`No Roon profile called "${name}" — the profiles: ${all.map((x) => x.name).join(', ') || 'none found'}`, 'invalid');
+  c.useProfile(p.id);
+}
+/** The profile in use now (by name): for roon_profiles. */
+export function profileInUse(c: RoonClient): string | undefined {
+  const id = c.profile();
+  return profilesOf(c).find((p) => p.id.equals(id))?.name;
+}
+
 /** What's known now, without connecting. */
 export const knownTarget = (): Target | null => target;
 
@@ -82,9 +110,11 @@ async function open(): Promise<RoonClient> {
 
 /** One question to the Core: queued, with the open connection or a new one; then the idle clock starts again. */
 export function withCore<T>(work: (c: RoonClient) => Promise<T>): Promise<T> {
+  const mine = asked.getStore();
   const task = queue.then(async () => {
     if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
-    try { return await work(await open()); }
+    wanted = mine;
+    try { const c = await open(); chooseProfile(c); return await work(c); }
     catch (e) {
       // A question Roon can't answer (an unknown key, a bad argument) leaves the connection fine; anything else may not.
       if (!(e instanceof RoonError && (e.kind === 'not_found' || e.kind === 'invalid'))) close('after an error');
@@ -99,7 +129,7 @@ export function withCore<T>(work: (c: RoonClient) => Promise<T>): Promise<T> {
 /** A fresh connection inside withCore (the play history wants a graph without earlier plays). */
 export async function fresh(): Promise<RoonClient> {
   close('a fresh graph');
-  return open();
+  const c = await open(); chooseProfile(c); return c;
 }
 
 /** Close after this question (the history leaves its plays in the graph). */

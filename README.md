@@ -44,6 +44,7 @@ Version 0.5: sixty-one tools (fifty-five with a read-only library; sixty-five wi
 | `roon_cover` | The cover of what plays, as an image |
 | `roon_history` | Roon's play history, newest first |
 | `roon_top` | Most played albums, artists or tracks over your whole history |
+| `roon_profiles` | The Roon profiles, and the one Deep Roon uses |
 | `roon_library` | Your library with Roon's Focus: stars, genre, label, artist, composer, producer, years, hi-res, live … sorted any way |
 | `roon_focus` | The Focus panel: what your library (or part of it) is made of, with counts |
 | `roon_tracks`, `roon_artists` | Focus on tracks and artists (and composers) |
@@ -160,7 +161,7 @@ or by hand in `~/.codex/config.toml`:
 [mcp_servers.deep-roon]
 command = "npx"
 args = ["-y", "deep-roon-mcp"]
-# env = { ROON_HOST = "", DEEP_ROON_TOOLS = "", DEEP_ROON_INTERNAL = "", DEEP_ROON_READ_ONLY = "" }
+# env = { ROON_HOST = "", ROON_PROFILE = "", DEEP_ROON_TOOLS = "", DEEP_ROON_INTERNAL = "", DEEP_ROON_READ_ONLY = "" }
 ```
 
 ChatGPT on the web can't run a server on your computer — use the desktop app.
@@ -173,17 +174,23 @@ ChatGPT on the web can't run a server on your computer — use the desktop app.
     "deep-roon": {
       "command": "npx",
       "args": ["-y", "deep-roon-mcp"],
-      "env": { "ROON_HOST": "", "DEEP_ROON_TOOLS": "", "DEEP_ROON_INTERNAL": "", "DEEP_ROON_READ_ONLY": "" }
+      "env": { "ROON_HOST": "", "ROON_PROFILE": "", "DEEP_ROON_TOOLS": "", "DEEP_ROON_INTERNAL": "", "DEEP_ROON_READ_ONLY": "" }
     }
   }
 }
 ```
 
-The same settings as environment variables: `ROON_HOST` (the Core's address, empty = find it), `DEEP_ROON_TOOLS=essentials`,
+The same settings as environment variables: `ROON_HOST` (the Core's address, empty = find it), `ROON_PROFILE` (a Roon profile
+by name, empty = the first; see below), `DEEP_ROON_TOOLS=essentials`,
 `DEEP_ROON_INTERNAL=off`, `DEEP_ROON_READ_ONLY=library` (nothing changes the library; playing works) or `DEEP_ROON_READ_ONLY=all`
 (Deep Roon only looks: no playing, queueing or zone changes either), `DEEP_ROON_PLAYLIST_EDIT=1` (the playlist edits). Leave out what you don't need. VS Code calls the block `"servers"` instead of `"mcpServers"`.
 
 Then, once, in Roon: Settings › Extensions › **Enable** next to "Deep Roon MCP". Until then the tools say so.
+
+**Roon profiles.** The play history, most played, Daily Picks, Daily Mixes, New for you, favourites and Listen Later belong to
+a Roon profile. Deep Roon is a Roon remote of its own, like each Roon app, so switching profiles in a Roon app doesn't change
+it: it uses `ROON_PROFILE` (or **Roon profile** in Claude Desktop's settings), else the first profile. Those tools also take
+`profile` for one question ("what did Anna play this week?"); `roon_profiles` lists the names.
 
 ### Over HTTP
 

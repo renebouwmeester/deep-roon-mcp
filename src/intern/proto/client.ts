@@ -50,6 +50,9 @@ export class RoonClient {
   readonly graph = new ObjectGraph();
   private readonly explicitProfile?: Buffer;
   private cachedProfile?: Buffer;
+  /** The profile chosen by name (7 Nov 2026, forum: "after switching profiles, roon_history still returns my first
+   *  profile") — see core/session.ts; unset = the explicit option, else the first Profile in the graph. */
+  private chosenProfile?: Buffer;
   private settleMs: number;
   /** Added 8 Oct 2026: a PING every 10 s while connected (see RemotingClient.ping); stops at the first failed one —
    *  a caller may replace conn.onclosed, so the close hook alone is not enough. */
@@ -73,7 +76,10 @@ export class RoonClient {
    * on every other Core the server matched nothing against it, which is a big
    * part of why search returned no results.
    */
+  useProfile(id: Buffer | undefined): void { this.chosenProfile = id; }
+
   profile(): Buffer {
+    if (this.chosenProfile) return this.chosenProfile;
     if (this.explicitProfile) return this.explicitProfile;
     if (this.cachedProfile) return this.cachedProfile;
     for (const o of this.graph.objects.values()) {

@@ -8,9 +8,11 @@ import * as zn from '../roon/zones';
 import * as rd from '../roon/radio';
 import * as off from '../core/officialtools';
 import { run } from './run';
+import { asProfile, profileInUse, profilesOf, withCore } from '../core/session';
 
 const READ = { readOnlyHint: true, openWorldHint: false } as const;
 const service = z.enum(['qobuz', 'tidal']).optional().describe('qobuz or tidal — default: Qobuz when it is signed in in Roon, else TIDAL.');
+const profile = z.string().optional().describe('A Roon profile by name (roon_profiles lists them) — default: ROON_PROFILE, else the first profile.');
 const limit = (max: number, dflt: number) => z.number().int().min(1).max(max).optional().describe(`How many (default ${dflt}, at most ${max}).`);
 
 export function registerReadTools(server: McpServer, internal = true): void {
@@ -118,15 +120,23 @@ export function registerReadTools(server: McpServer, internal = true): void {
     title: 'Play history',
     description: 'What was played in Roon, newest first — Roon\'s own play history, with how much of each track was heard. Goes back as far as Roon\'s history does — Roon filters by date itself: `since` and `before` (YYYY-MM-DD) give the plays in that window (e.g. "what did I play in March 2019": since 2019-03-01, before 2019-04-01; up to 500 per call, `offset` for the next ones). For "most played" questions use roon_top instead of counting this.',
     inputSchema: { limit: limit(500, 30), offset: z.number().int().min(0).optional(), since: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe('Only plays from this date on (YYYY-MM-DD).'),
-      before: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe('Only plays before this date (YYYY-MM-DD).') },
+      before: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe('Only plays before this date (YYYY-MM-DD).'), profile },
     annotations: READ,
-  }, ({ limit: n, offset, since, before }) => run(() => hist.history(n ?? 30, offset ?? 0, before, since)));
+  }, ({ limit: n, offset, since, before, profile: p }) => run(() => asProfile(p, () => hist.history(n ?? 30, offset ?? 0, before, since))));
 
   reg('roon_top', {
     title: 'Most played',
     description: 'The most played albums, artists or tracks in Roon, counted over the WHOLE play history (a play counts when at least half the track was heard). Use this for "most listened" questions — don\'t tally roon_history yourself. `since` and `until` (YYYY-MM-DD) limit the period — Roon filters by date itself, however far back: "what did I play most in March 2019" is since 2019-03-01, until 2019-04-01.',
     inputSchema: { what: z.enum(['albums', 'artists', 'tracks']).optional(), limit: limit(100, 20), since: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe('Only plays from this date on (YYYY-MM-DD).'),
-      until: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe('Only plays before this date (YYYY-MM-DD).') },
+      until: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe('Only plays before this date (YYYY-MM-DD).'), profile },
     annotations: READ,
-  }, ({ what, limit: n, since, until }) => run(() => hist.top(what ?? 'albums', n ?? 20, since, until)));
+  }, ({ what, limit: n, since, until, profile: p }) => run(() => asProfile(p, () => hist.top(what ?? 'albums', n ?? 20, since, until))));
+
+  // The profiles (7 Nov 2026, forum): history, top, Home, favourites and Listen Later are per profile.
+  reg('roon_profiles', {
+    title: 'Roon profiles',
+    description: 'The profiles on this Roon Core, and the one Deep Roon uses (`in_use`). Deep Roon is a Roon remote of its own: switching profiles in a Roon app doesn\'t change it. The play history, most played, Daily Picks, Daily Mixes, New for you, favourites and Listen Later are per profile — those tools take `profile` (a name from here) for one question; ROON_PROFILE sets the default.',
+    inputSchema: {},
+    annotations: READ,
+  }, () => run(() => withCore(async (c) => ({ profiles: profilesOf(c).map((p) => p.name), in_use: profileInUse(c), default: process.env.ROON_PROFILE?.trim() || null }))));
 }

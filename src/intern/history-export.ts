@@ -244,9 +244,16 @@ export async function exportPlayHistory(
   const [queryOid] = readFlexLong(Uint8Array.from(result.payload), 0);
 
   try {
+    // An empty history (7 Nov 2026, a new profile): Roon's sparse encoding leaves a Count of 0 out, so the query object
+    // comes without one. Seen for 1.5 s with no Count = 0.
+    let seen = 0;
     const total = await pollFor('history Count', timeoutMs, pollIntervalMs, () => {
-      const count = field(client.graph.getObject(queryOid), '::Count');
-      if (count === undefined) return undefined;
+      const q = client.graph.getObject(queryOid);
+      const count = field(q, '::Count');
+      if (count === undefined) {
+        if (q && !seen) seen = Date.now();
+        return q && Date.now() - seen >= 1500 ? 0 : undefined;
+      }
       if (!Number.isSafeInteger(count) || (count as number) < 0) {
         throw new Error(`invalid history Count: ${String(count)}`);
       }

@@ -9,6 +9,7 @@ import * as more from '../roon/more';
 import * as rd from '../roon/radio';
 import * as tidal from '../roon/tidal';
 import { run } from './run';
+import { asProfile } from '../core/session';
 import { registerPlaylistEditTools } from './playlist-edit';
 
 const READ = { readOnlyHint: true, openWorldHint: false } as const;
@@ -17,6 +18,7 @@ const PLAYS = { readOnlyHint: false, destructiveHint: false, openWorldHint: fals
 const CHANGES = { readOnlyHint: false, destructiveHint: true, openWorldHint: false } as const;
 const zone = z.string().describe('A Roon zone name (see roon_zones).');
 const mode = z.enum(['now', 'next', 'queue']).optional().describe('now (default), next, or queue (at the end).');
+const profile = z.string().optional().describe('A Roon profile by name (roon_profiles lists them) — default: ROON_PROFILE, else the first profile.');
 const limit = (max: number, dflt: number) => z.number().int().min(1).max(max).optional().describe(`How many (default ${dflt}, at most ${max}).`);
 const offset = z.number().int().min(0).optional().describe('Paging: where to start (in steps of `limit`).');
 const days = z.number().int().min(1).optional();
@@ -92,30 +94,30 @@ export function registerLibraryTools(server: McpServer): void {
   server.registerTool('roon_daily_picks', {
     title: 'Daily Picks',
     description: 'Roon\'s Daily Picks from the Home screen — today\'s personal recommendations, in boxes. Each box has its `kind`, its `reason` (new_release; recent = from what was played lately; all_time = from long-term listening) and `because_you_played` — the album the box is built on — plus the recommended albums with a `key`. `limit` is per box (default 8). THE tool for "what does Roon recommend today", "my daily picks".',
-    inputSchema: { limit: limit(30, 8) },
+    inputSchema: { limit: limit(30, 8), profile },
     annotations: READ,
-  }, ({ limit: n }) => run(() => home.dailyPicks(n ?? 8)));
+  }, ({ limit: n, profile: p }) => run(() => asProfile(p, () => home.dailyPicks(n ?? 8))));
 
   server.registerTool('roon_mix', {
     title: 'A Daily Mix\'s tracks',
     description: 'The tracks inside one of Roon\'s Daily Mixes (by `key` or name from roon_mixes), as Roon\'s mix page shows them before playing — each with a `key` for roon_play_tracks. To play the whole mix, roon_play_mix.',
-    inputSchema: { key: z.string().describe('A mix key or its name, from roon_mixes.'), limit: limit(300, 100) },
+    inputSchema: { key: z.string().describe('A mix key or its name, from roon_mixes.'), limit: limit(300, 100), profile },
     annotations: READ,
-  }, ({ key, limit: n }) => run(() => home.mix(key, n ?? 100)));
+  }, ({ key, limit: n, profile: p }) => run(() => asProfile(p, () => home.mix(key, n ?? 100))));
 
   server.registerTool('roon_new_for_you', {
     title: 'New releases for you',
     description: '"New releases for you" from Roon\'s Home: new albums Roon picked for this user, from the artists and music they listen to — personal, unlike roon_new (the streaming services\' editorial shelf, the same for everyone). Use it for "my new releases", "what\'s new for me". Albums carry year, format, `genres`, sometimes a `review`, and a `key`; `genres` at the top counts the shelf\'s top-level genres (the choices for `genre`).',
-    inputSchema: { limit: limit(100, 30), offset, genre: z.string().optional().describe('Only albums of this genre (a Roon genre name, e.g. Jazz; sub-genres match too).') },
+    inputSchema: { limit: limit(100, 30), offset, genre: z.string().optional().describe('Only albums of this genre (a Roon genre name, e.g. Jazz; sub-genres match too).'), profile },
     annotations: READ,
-  }, ({ limit: n, offset: o, genre }) => run(() => home.newForYou(n ?? 30, o ?? 0, genre)));
+  }, ({ limit: n, offset: o, genre, profile: p }) => run(() => asProfile(p, () => home.newForYou(n ?? 30, o ?? 0, genre))));
 
   server.registerTool('roon_mixes', {
     title: 'Daily Mixes',
     description: 'Roon\'s own Daily Mixes, from Roon\'s Home — NOT TIDAL\'s mixes: for "TIDAL mixes", "My Mix", "My Daily Discovery" or TIDAL\'s daily mixes use roon_tidal_playlists with `shelf: "my_mixes"`. These are today\'s personal Roon mixes, each built around an artist (or genre) the user listens to, with a few `touchstones` and a `key` for roon_play_mix. They change every day.',
-    inputSchema: {},
+    inputSchema: { profile },
     annotations: READ,
-  }, () => run(() => home.mixes()));
+  }, ({ profile: p }) => run(() => asProfile(p, () => home.mixes())));
 
   server.registerTool('roon_play_mix', {
     title: 'Play a Daily Mix',
@@ -169,9 +171,9 @@ export function registerLibraryTools(server: McpServer): void {
   server.registerTool('roon_favorites', {
     title: 'Favourite albums',
     description: 'The user\'s favourite albums: `source: "roon"` (default) are the albums with a heart in Roon, newest first; `source: "qobuz"` or `"tidal"` the favourites at that service. Albums carry a `key`.',
-    inputSchema: { source: z.enum(['roon', 'qobuz', 'tidal']).optional(), limit: limit(100, 50) },
+    inputSchema: { source: z.enum(['roon', 'qobuz', 'tidal']).optional(), limit: limit(100, 50), profile },
     annotations: READ,
-  }, ({ source, limit: n }) => run(() => more.favorites(source ?? 'roon', n ?? 50)));
+  }, ({ source, limit: n, profile: p }) => run(() => asProfile(p, () => more.favorites(source ?? 'roon', n ?? 50))));
 
   server.registerTool('roon_radio_favorite', {
     title: 'A station in My Live Radio',
@@ -190,9 +192,9 @@ export function registerLibraryTools(server: McpServer): void {
   server.registerTool('roon_listen_later', {
     title: 'Listen Later',
     description: 'The user\'s Listen Later list in Roon: the albums (and tracks) marked to hear later, newest first, each with a `key`. By default only what still waits; `include_played: true` adds what has been heard since.',
-    inputSchema: { include_played: z.boolean().optional() },
+    inputSchema: { include_played: z.boolean().optional(), profile },
     annotations: READ,
-  }, ({ include_played }) => run(() => more.listenLater(include_played === true)));
+  }, ({ include_played, profile: p }) => run(() => asProfile(p, () => more.listenLater(include_played === true))));
 
   server.registerTool('roon_listen_later_set', {
     title: 'Listen Later: add or remove',

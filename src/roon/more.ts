@@ -15,8 +15,11 @@ import { playlistKey } from './tidal';
 import { currentEndpoints, findZone, zoneNames } from './zones';
 import { How, PRIORITY, outputsOf, playParams, started } from './control';
 
+// The Profile object of the profile in use (7 Nov 2026: was the first one, whatever ROON_PROFILE or `profile` chose).
 const profileObject = (c: C) => {
-  const p = [...c.graph.objects.values()].find((o) => o.typeName.endsWith('.Profile'));
+  const id = c.profile();
+  const all = [...c.graph.objects.values()].filter((o) => o.typeName.endsWith('.Profile'));
+  const p = all.find((o) => { const v = field(o, 'ProfileId'); return Buffer.isBuffer(v) && v.equals(id); }) ?? all[0];
   if (!p) throw new RoonError('Roon gave no profile');
   return p;
 };

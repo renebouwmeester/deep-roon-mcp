@@ -44,6 +44,7 @@ const manifest = {
       args: ['${__dirname}/server/index.js'],
       env: {
         ROON_HOST: '${user_config.roon_host}',
+        ROON_PROFILE: '${user_config.roon_profile}',
         DEEP_ROON_TOOLS: '${user_config.essentials}',
         DEEP_ROON_INTERNAL: '${user_config.internal_protocol}',
         DEEP_ROON_READ_ONLY: '${user_config.read_only}',
@@ -55,6 +56,10 @@ const manifest = {
     roon_host: {
       type: 'string', title: 'Roon Core address', required: false, default: '',
       description: 'Leave empty: Deep Roon MCP finds the Core on your network. Fill in the Core\'s address when it is on another subnet or reached over a VPN such as Tailscale (a private one only).',
+    },
+    roon_profile: {
+      type: 'string', title: 'Roon profile', required: false, default: '',
+      description: 'The name of the Roon profile whose history, Daily Picks, mixes, favourites and Listen Later Deep Roon uses. Leave empty: the first profile. Deep Roon is a Roon remote of its own — switching profiles in a Roon app doesn\'t change it.',
     },
     essentials: {
       type: 'boolean', title: 'Essentials only', required: false, default: false,
