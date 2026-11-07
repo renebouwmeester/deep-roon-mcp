@@ -1,0 +1,41 @@
+{
+  "source": "https://github.com/arthursoares/roon-api-reverse-engineering/blob/8b67208f640e760f3b18431140e17469a059e90c/roon-internal-api/src/catalog/catalog.authoritative.json",
+  "signatures": {
+    "GetPlaylist": [
+      "Sooloos.Broker.Api.Playlists::GetPlaylist(Sooloos.Broker.Api.PlaylistBase, Base.ResultCallback<Sooloos.Broker.Api.Playlist>)",
+      "Sooloos.Broker.Api.Playlists::GetPlaylist(System.Sooid, Base.ResultCallback<Sooloos.Broker.Api.Playlist>)"
+    ],
+    "RemoveItems": [
+      "Sooloos.Broker.Api.Playlists::RemoveItems(Sooloos.Broker.Api.Playlist, System.Collections.Generic.IEnumerable<Sooloos.Broker.Api.PlaylistItem>)"
+    ],
+    "InsertMedia": [
+      "Sooloos.Broker.Api.Playlists::InsertMedia(Sooloos.Broker.Api.Playlist, System.Collections.Generic.IEnumerable<long>, Sooloos.Broker.Api.InsertionPoint, Sooloos.Broker.Api.PlaylistItem)",
+      "Sooloos.Broker.Api.Playlists::InsertMedia(Sooloos.Broker.Api.Playlist, System.Collections.Generic.IEnumerable<long>, Sooloos.Broker.Api.InsertionPoint, Sooloos.Broker.Api.PlaylistItem, Base.ResultCallback<Sooloos.Broker.Api.PlaylistInsertionResult>)"
+    ],
+    "MoveItems": [
+      "Sooloos.Broker.Api.Playlists::MoveItems(Sooloos.Broker.Api.Playlist, System.Collections.Generic.IEnumerable<Sooloos.Broker.Api.PlaylistItem>, Sooloos.Broker.Api.InsertionPoint, Sooloos.Broker.Api.PlaylistItem, Base.ResultCallback)"
+    ],
+    "Rename": [
+      "Sooloos.Broker.Api.Playlists::Rename(Sooloos.Broker.Api.Playlist, string, bool, Base.ResultCallback)",
+      "Sooloos.Broker.Api.Playlists::Rename(Sooloos.Broker.Api.Playlist, string, Base.ResultCallback)"
+    ]
+  },
+  "insertionPoint": [
+    {
+      "name": "Beginning",
+      "value": 0
+    },
+    {
+      "name": "End",
+      "value": 1
+    },
+    {
+      "name": "After",
+      "value": 2
+    },
+    {
+      "name": "Before",
+      "value": 3
+    }
+  ]
+}

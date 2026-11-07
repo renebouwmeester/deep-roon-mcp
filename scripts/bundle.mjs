@@ -14,7 +14,7 @@ if (!fs.existsSync(server)) { console.error('dist/deep-roon-mcp.js is missing â€
 
 // The tools, from the server (no Core needed for tools/list).
 const client = new Client({ name: 'bundle', version: pkg.version });
-await client.connect(new StdioClientTransport({ command: process.execPath, args: [server], env: { ...process.env, DEEP_ROON_NO_UPDATE_CHECK: '1', ROON_HOST: '127.0.0.1' }, stderr: 'ignore' }));
+await client.connect(new StdioClientTransport({ command: process.execPath, args: [server], env: { ...process.env, DEEP_ROON_NO_UPDATE_CHECK: '1', ROON_HOST: '127.0.0.1', DEEP_ROON_PLAYLIST_EDIT: '1' }, stderr: 'ignore' }));
 const { tools } = await client.listTools();
 await client.close();
 
@@ -47,6 +47,7 @@ const manifest = {
         DEEP_ROON_TOOLS: '${user_config.essentials}',
         DEEP_ROON_INTERNAL: '${user_config.internal_protocol}',
         DEEP_ROON_READ_ONLY: '${user_config.read_only}',
+        DEEP_ROON_PLAYLIST_EDIT: '${user_config.playlist_editing}',
       },
     },
   },
@@ -66,6 +67,10 @@ const manifest = {
     read_only: {
       type: 'boolean', title: 'Read-only library', required: false, default: false,
       description: 'On: Deep Roon never changes your Roon library â€” no playlists, hearts, Listen Later, library additions or DSP changes. Playing music still works.',
+    },
+    playlist_editing: {
+      type: 'boolean', title: 'Edit existing playlists (experimental)', required: false, default: false,
+      description: 'On: four more tools add, remove, move and rename tracks in your own Roon playlists. Each edit is checked against a fresh read and verified afterwards. Off with a read-only library.',
     },
   },
   tools: tools.map((t) => ({ name: t.name, description: t.title ?? t.description?.split('. ')[0] ?? t.name })),

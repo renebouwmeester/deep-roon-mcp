@@ -9,6 +9,7 @@ import * as more from '../roon/more';
 import * as rd from '../roon/radio';
 import * as tidal from '../roon/tidal';
 import { run } from './run';
+import { registerPlaylistEditTools } from './playlist-edit';
 
 const READ = { readOnlyHint: true, openWorldHint: false } as const;
 const PLAYS = { readOnlyHint: false, destructiveHint: false, openWorldHint: false } as const;
@@ -124,6 +125,7 @@ export function registerLibraryTools(server: McpServer): void {
   }, ({ key, zone: zn, mode: m }) => run(() => home.playMix(key, zn, m ?? 'now')));
 
   // ---- playlists ----
+  registerPlaylistEditTools(server);
   server.registerTool('roon_playlists', {
     title: 'Playlists',
     description: 'The playlists in the user\'s Roon: their own Roon playlists, Qobuz and TIDAL playlists they added, and editorial ones — each with a `key` for roon_playlist and roon_play_playlist, the number of tracks, and whether it is read-only.',

@@ -22,7 +22,7 @@ server of its own and sends nothing anywhere else. What you ask goes to your MCP
 
 ## Status
 
-Version 0.5: fifty-nine tools (fifty-three with a read-only library). Qobuz, TIDAL or both — whatever is signed in on your Core.
+Version 0.5: sixty-one tools (fifty-five with a read-only library; sixty-five with playlist editing on). Qobuz, TIDAL or both — whatever is signed in on your Core.
 
 **Reading** — changes nothing in Roon:
 
@@ -52,6 +52,7 @@ Version 0.5: fifty-nine tools (fifty-three with a read-only library). Qobuz, TID
 | `roon_new_for_you` | New releases Roon picked for you |
 | `roon_mixes` | Today's Daily Mixes |
 | `roon_playlists`, `roon_playlist` | Your playlists, and one playlist's tracks |
+| `roon_playlist_snapshot` | One of your playlists complete, with an id for every track in it (also a track that's in it twice) — what the playlist edits below work from |
 | `roon_tidal_playlists` | TIDAL's playlists: its editorial shelves, by genre or mood, and your own TIDAL mixes |
 | `roon_favorites` | Albums with a heart in Roon, or your Qobuz or TIDAL favourites |
 | `roon_listen_later` | Your Listen Later list |
@@ -99,6 +100,19 @@ Version 0.5: fifty-nine tools (fifty-three with a read-only library). Qobuz, TID
 | `roon_dsp_set` | MUSE on or off, one part on or off, or a preset |
 | `roon_radio_favorite` | A station into My Live Radio, or out of it |
 
+**Editing your own playlists** — experimental, and off until you switch on **Edit existing playlists** below
+(`DEEP_ROON_PLAYLIST_EDIT=1`). Only your own Roon playlists; imported, smart, Qobuz and TIDAL playlists are refused. Each
+edit starts from a fresh `roon_playlist_snapshot`, is checked once more right before it's written, and is read back in
+full afterwards; if that read doesn't match, it says so and doesn't try again. With **Read-only library** on they aren't
+there. Contributed by kvarnelis on GitHub.
+
+| Tool | What it does |
+|---|---|
+| `roon_playlist_add_tracks` | Tracks into a playlist, at the end or before a given track |
+| `roon_playlist_remove_tracks` | Tracks out of a playlist — only the ones you point at, not other copies of the same track |
+| `roon_playlist_reorder_tracks` | Tracks to another place in a playlist |
+| `roon_playlist_rename` | A playlist under a new name (never onto a name another playlist already has) |
+
 ## Install
 
 Deep Roon MCP runs on a computer on the same network as your Roon Core (Mac, Windows or Linux), next to your MCP client.
@@ -117,9 +131,10 @@ The settings (Claude Desktop › Settings › Extensions › Deep Roon MCP):
 | Setting | What it does |
 |---|---|
 | Roon Core address | Empty: found on your network. Fill in the Core's address for another subnet or a private VPN (Tailscale) |
-| Essentials only | Seventeen tools instead of fifty-nine, for small models |
+| Essentials only | Seventeen tools instead of sixty-one, for small models |
 | Use Roon's internal protocol | Off: only the official API — zones, playback, volume, grouping; no search, reviews, Focus or history |
 | Read-only library | On: Deep Roon never changes your library — no playlists, hearts, Listen Later, library additions or DSP. Playing still works |
+| Edit existing playlists | Experimental, off by default. On: the four playlist edits above |
 
 ### Other clients
 
@@ -166,7 +181,7 @@ ChatGPT on the web can't run a server on your computer — use the desktop app.
 
 The same settings as environment variables: `ROON_HOST` (the Core's address, empty = find it), `DEEP_ROON_TOOLS=essentials`,
 `DEEP_ROON_INTERNAL=off`, `DEEP_ROON_READ_ONLY=library` (nothing changes the library; playing works) or `DEEP_ROON_READ_ONLY=all`
-(Deep Roon only looks: no playing, queueing or zone changes either). Leave out what you don't need. VS Code calls the block `"servers"` instead of `"mcpServers"`.
+(Deep Roon only looks: no playing, queueing or zone changes either), `DEEP_ROON_PLAYLIST_EDIT=1` (the playlist edits). Leave out what you don't need. VS Code calls the block `"servers"` instead of `"mcpServers"`.
 
 Then, once, in Roon: Settings › Extensions › **Enable** next to "Deep Roon MCP". Until then the tools say so.
 

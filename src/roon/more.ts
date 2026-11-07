@@ -24,7 +24,7 @@ const decoded = (c: C, payload: Buffer) => (payload.length ? c.graph.decodeRetur
 
 // ---- playlists ----
 const PLAYLIST_KIND: Record<number, string> = { 1: 'itunes', 5: 'roon', 6: 'roon (read-only)', 10: 'TIDAL', 11: 'file', 12: 'qobuz', 13: 'roon editorial', 15: 'smart' };
-function allPlaylists(c: C) {
+export function allPlaylists(c: C) {
   const service = c.graph.findByType('Playlists')[0];
   if (!service) throw new RoonError('Roon gives no playlists service', 'unavailable');
   return { service, list: items(c, field(service, 'AllPlaylists')) };

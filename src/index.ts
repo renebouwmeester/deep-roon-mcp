@@ -13,6 +13,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { registerReadTools } from './tools/read';
 import { registerControlTools } from './tools/control';
 import { registerLibraryTools } from './tools/library';
+import { PLAYLIST_WRITES } from './tools/playlist-edit';
 import { registerStatusTool } from './tools/status';
 import { afterFirstConnect } from './core/session';
 import { checkForUpdate, selfTest } from './core/status';
@@ -31,7 +32,7 @@ const INSTRUCTIONS = `Deep Roon MCP connects to the user's own Roon Core (music 
 /** The server with its tools, as the switches say. */
 /** The tools that write into the Core's library or settings through the internal protocol (0.5.0): left out with
  *  DEEP_ROON_READ_ONLY. Playback (a queue, a volume, a zone's state) passes; the library, playlists and DSP don't change. */
-const LIBRARY_WRITES = new Set(['roon_playlist_create', 'roon_favorite', 'roon_radio_favorite', 'roon_listen_later_set', 'roon_library_add', 'roon_dsp_set']);
+const LIBRARY_WRITES = new Set([...PLAYLIST_WRITES, 'roon_playlist_create', 'roon_favorite', 'roon_radio_favorite', 'roon_listen_later_set', 'roon_library_add', 'roon_dsp_set']);
 /** With DEEP_ROON_READ_ONLY=all also everything that plays, queues or switches a zone: Deep Roon only looks. */
 const PLAYBACK = new Set(['roon_play', 'roon_play_tracks', 'roon_play_radio', 'roon_play_mix', 'roon_play_playlist', 'roon_control', 'roon_seek', 'roon_volume',
   'roon_settings', 'roon_queue_jump', 'roon_queue_remove', 'roon_queue_move', 'roon_queue_clear', 'roon_transfer', 'roon_group', 'roon_ungroup', 'roon_sleep', 'roon_standby']);
