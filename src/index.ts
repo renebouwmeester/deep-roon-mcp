@@ -35,7 +35,7 @@ const INSTRUCTIONS = `Deep Roon MCP connects to the user's own Roon Core (music 
  *  DEEP_ROON_READ_ONLY. Playback (a queue, a volume, a zone's state) passes; the library, playlists and DSP don't change. */
 const LIBRARY_WRITES = new Set([...PLAYLIST_WRITES, 'roon_playlist_create', 'roon_favorite', 'roon_radio_favorite', 'roon_listen_later_set', 'roon_library_add', 'roon_dsp_set']);
 /** With DEEP_ROON_READ_ONLY=all also everything that plays, queues or switches a zone: Deep Roon only looks. */
-const PLAYBACK = new Set(['roon_play', 'roon_play_tracks', 'roon_play_radio', 'roon_play_mix', 'roon_play_playlist', 'roon_control', 'roon_seek', 'roon_volume',
+const PLAYBACK = new Set(['roon_device_reset', 'roon_play', 'roon_play_tracks', 'roon_play_radio', 'roon_play_mix', 'roon_play_playlist', 'roon_control', 'roon_seek', 'roon_volume',
   'roon_settings', 'roon_queue_jump', 'roon_queue_remove', 'roon_queue_move', 'roon_queue_clear', 'roon_transfer', 'roon_group', 'roon_ungroup', 'roon_sleep', 'roon_standby']);
 export type ReadOnly = 'off' | 'library' | 'all';
 

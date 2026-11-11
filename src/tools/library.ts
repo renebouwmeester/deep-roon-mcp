@@ -6,6 +6,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import * as fc from '../roon/focus';
 import * as home from '../roon/home';
 import * as more from '../roon/more';
+import * as dev from '../roon/devices';
 import * as rd from '../roon/radio';
 import * as tidal from '../roon/tidal';
 import { run } from './run';
@@ -246,4 +247,19 @@ export function registerLibraryTools(server: McpServer): void {
     inputSchema: { zone, enabled: z.boolean().optional(), part: z.string().optional(), preset: z.string().optional() },
     annotations: CHANGES,
   }, ({ zone: zn, enabled, part, preset }) => run(() => more.dspSet(zn, { enabled, part, preset })));
+
+  // ---- audio devices (Settings → Audio) ----
+  server.registerTool('roon_devices', {
+    title: 'Audio devices',
+    description: 'Roon\'s RAAT audio devices as Settings → Audio shows them: per device its name, the machine and address of its RAAT server, whether it is enabled, and whether it has a zone now. An enabled device without a zone is usually stuck on "Enabling…" (see roon_device_reset).',
+    inputSchema: {},
+    annotations: READ,
+  }, () => run(() => dev.devices()));
+
+  server.registerTool('roon_device_reset', {
+    title: 'Reset a stuck device',
+    description: 'Disable and enable a RAAT device that is enabled but has no zone — what you do by hand in Settings → Audio when a device hangs on "Enabling…" (Roon backs off after failed connections, e.g. a phone that changed networks). Only devices in that state are touched; others are left alone. By `name` or by `ip`, the address of the device\'s RAAT server (from roon_devices). Reads back.',
+    inputSchema: { name: z.string().optional().describe('The device name, as in roon_devices.'), ip: z.string().optional().describe('The address of its RAAT server, as in roon_devices.') },
+    annotations: CHANGES,
+  }, ({ name, ip }) => run(() => dev.deviceReset({ name, ip })));
 }
