@@ -1,6 +1,6 @@
 {
   "name": "deep-roon-mcp",
-  "version": "0.5.8",
+  "version": "0.5.9",
   "description": "An MCP server for Roon that reaches the parts the official API doesn't: reviews, biographies, Qobuz's and TIDAL's shelves, TIDAL's playlists, your history, search across your library and the streaming services",
   "license": "Apache-2.0",
   "author": "René Bouwmeester <21277119+renebouwmeester@users.noreply.github.com>",

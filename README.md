@@ -22,7 +22,7 @@ server of its own and sends nothing anywhere else. What you ask goes to your MCP
 
 ## Status
 
-Version 0.5: sixty-one tools (fifty-five with a read-only library; sixty-five with playlist editing on). Qobuz, TIDAL or both — whatever is signed in on your Core.
+Version 0.5: sixty-four tools (fifty-eight with a read-only library; sixty-eight with playlist editing on). Qobuz, TIDAL or both — whatever is signed in on your Core.
 
 **Reading** — changes nothing in Roon:
 
@@ -61,6 +61,7 @@ Version 0.5: sixty-one tools (fifty-five with a read-only library; sixty-five wi
 | `roon_similar` | More like this, for an album or an artist |
 | `roon_signal_path` | Roon's signal path for what plays: is it bit-perfect, what happens on the way |
 | `roon_dsp` | MUSE: the DSP set up for a zone |
+| `roon_devices` | The RAAT audio devices of Settings › Audio: enabled, and whether they have a zone |
 | `roon_radio` | Live Radio: your own stations, the directory by category and genre |
 
 **Playing** — only on your request:
@@ -79,6 +80,7 @@ Version 0.5: sixty-one tools (fifty-five with a read-only library; sixty-five wi
 | `roon_group`, `roon_ungroup` | Group zones, and undo it |
 | `roon_sleep` | A sleep timer |
 | `roon_standby` | Put a device in standby, or wake it |
+| `roon_device_reset` | Disable and enable a device stuck on "Enabling…" (enabled, no zone) — only those |
 | `roon_play_playlist` | A playlist on a zone (also a TIDAL one), optionally shuffled |
 | `roon_play_mix` | One of today's Daily Mixes |
 | `roon_play_radio` | A Live Radio station on a zone |
