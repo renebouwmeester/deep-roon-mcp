@@ -6,7 +6,9 @@
 //   ROON_PROFILE=<name>          the Roon profile to use (history, Home, favourites, Listen Later); empty = the first
 //   DEEP_ROON_HTTP=[host:]port   serve MCP over HTTP (Streamable HTTP, stateless, POST /mcp) instead of stdio — for a
 //                                client that can't start a local process. No authentication: keep it on 127.0.0.1 (the
-//                                default host) or behind something that has it.
+//                                default host) or behind something that has it. A browser can't reach it either: a request
+//                                with an Origin header is refused, and on a loopback host only a loopback Host header is
+//                                accepted (against DNS rebinding); bodies over 4 MB are refused.
 import http from 'http';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -37,7 +39,8 @@ const LIBRARY_WRITES = new Set([...PLAYLIST_WRITES, 'roon_playlist_create', 'roo
 /** With DEEP_ROON_READ_ONLY=all also everything that plays, queues or switches a zone: Deep Roon only looks. */
 const PLAYBACK = new Set(['roon_device_reset', 'roon_play', 'roon_play_tracks', 'roon_play_radio', 'roon_play_mix', 'roon_play_playlist', 'roon_control', 'roon_seek', 'roon_volume',
   'roon_settings', 'roon_queue_jump', 'roon_queue_remove', 'roon_queue_move', 'roon_queue_clear', 'roon_transfer', 'roon_group', 'roon_ungroup', 'roon_sleep', 'roon_standby']);
-export type ReadOnly = 'off' | 'library' | 'all';
+import { readOnlyMode, type ReadOnly } from './core/readonly';
+export type { ReadOnly };
 
 function buildServer(internal: boolean, essentials: boolean, readOnly: ReadOnly = 'off'): McpServer {
   const instructions = readOnly === 'off' ? INSTRUCTIONS : INSTRUCTIONS + (readOnly === 'all'
@@ -64,18 +67,27 @@ function serveHttp(spec: string, internal: boolean, essentials: boolean, readOnl
   const m = /^(?:(.+):)?(\d+)$/.exec(spec.trim());
   if (!m) { log(`DEEP_ROON_HTTP should be [host:]port, not "${spec}"`); process.exit(1); }
   const host = m[1] || '127.0.0.1', port = Number(m[2]);
-  const web = http.createServer(async (req, res) => {
+  const loopback = ['127.0.0.1', 'localhost', '::1', '[::1]'].includes(host);
+  const okHost = (h: string | undefined) => !loopback || /^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/i.test(h ?? '');
+  const handle = async (req: http.IncomingMessage, res: http.ServerResponse) => {
     if (req.url?.split('?')[0] !== '/mcp') { res.writeHead(404).end(); return; }
     if (req.method !== 'POST') { res.writeHead(405, { allow: 'POST' }).end(); return; }
-    const chunks: Buffer[] = [];
-    for await (const c of req) chunks.push(c as Buffer);
+    // Not from a browser (15 Nov 2026): a web page could POST here (a CORS-simple text/plain body) or rebind a name to
+    // 127.0.0.1 and read the answers. MCP clients don't send Origin; browsers always do on a cross-site POST.
+    if (req.headers.origin || !okHost(req.headers.host)) { res.writeHead(403).end('Forbidden'); req.resume(); return; }
+    const chunks: Buffer[] = []; let size = 0;
+    for await (const c of req) { size += (c as Buffer).length; if (size > 4 * 1024 * 1024) { res.writeHead(413).end('Too large'); req.destroy(); return; } chunks.push(c as Buffer); }
     let body: unknown;
     try { body = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { res.writeHead(400).end('Parse error'); return; }
     const server = buildServer(internal, essentials, readOnly);
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
     res.on('close', () => { transport.close().catch(() => {}); server.close().catch(() => {}); });
-    try { await server.connect(transport); await transport.handleRequest(req, res, body); }
-    catch (e) { log(`http: ${(e as Error).message}`); if (!res.headersSent) res.writeHead(500).end(); }
+    await server.connect(transport); await transport.handleRequest(req, res, body);
+  };
+  // The whole request in one try (15 Nov 2026): a client that dropped mid-body made the body read reject outside the old
+  // try — an unhandled rejection, and Node ends the process (Roon gone for every client until a restart).
+  const web = http.createServer((req, res) => {
+    handle(req, res).catch((e) => { log(`http: ${(e as Error).message}`); if (!res.headersSent) { try { res.writeHead(500).end(); } catch { /* gone */ } } });
   });
   web.listen(port, host, () => log(`${version} ready (http://${host}:${port}/mcp)`));
 }
@@ -87,8 +99,9 @@ async function main(): Promise<void> {
   const internal = !/^(off|false|0|no)$/i.test(process.env.DEEP_ROON_INTERNAL ?? '');
   const essentials = /^(essentials|true|1|yes)$/i.test(process.env.DEEP_ROON_TOOLS ?? process.env.DEEP_ROON_ESSENTIALS ?? '');
   //   DEEP_ROON_READ_ONLY=library   (or 1/true/yes) nothing changes the library, playlists, hearts or DSP; =all: also no playback
-  const ro = (process.env.DEEP_ROON_READ_ONLY ?? '').trim().toLowerCase();
-  const readOnly: ReadOnly = ro === 'all' ? 'all' : /^(library|true|1|yes)$/.test(ro) ? 'library' : 'off';
+  const readOnly: ReadOnly = readOnlyMode();
+  // A backstop: one stray rejection must not end the server for every client.
+  process.on('unhandledRejection', (e) => log(`unhandled: ${(e as Error)?.message ?? String(e)}`));
   if (internal) afterFirstConnect(() => selfTest(runSelfTest));
   checkForUpdate().catch(() => {});
   log(`${internal ? 'internal protocol on' : 'internal protocol OFF — official API only'}${essentials ? ', essentials' : ''}${readOnly === 'off' ? '' : readOnly === 'all' ? ', READ-ONLY (looks only)' : ', read-only library'}`);

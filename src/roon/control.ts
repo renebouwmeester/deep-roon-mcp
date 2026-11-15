@@ -11,6 +11,7 @@ import { log } from '../core/log';
 import { Any, C, clean, duration, field, imageKey, items, obj, short, wait, trackArtist } from './graph';
 import { findAlbum, findTracks } from './library';
 import { findZone, zoneNames } from './zones';
+import { pickByName } from '../core/namematch';
 
 export type How = 'now' | 'next' | 'queue';
 // PlayPriority: Now = 0, Interrupt = 1, PlayBefore = 2, Next = 3, Queue = 4.
@@ -301,7 +302,8 @@ export async function ungroup(zoneName: string, only?: string) {
     const z = findZone(c, zoneName);
     const all = outputsOf(c, z.oid);
     if (all.length < 2) throw new RoonError(`${z.name} isn't in a group`, 'invalid');
-    const off = only ? all.filter((e) => String(field(e, 'Name')).toLowerCase().includes(only.toLowerCase())) : all;
+    const een = only ? pickByName(all, only, (e) => String(field(e, 'Name')), 'output in this group') : undefined;
+    const off = only ? (een ? [een] : []) : all;
     if (!off.length) throw new RoonError(`"${only}" isn't in this group (${all.map((e) => field(e, 'Name')).join(' + ')})`, 'not_found');
     const res = await c.call('Transport', 'UnlinkEndpoints', [{ type: 'IEnumerable<Endpoint>', name: 'endpoints' }, { type: 'ResultCallback', name: 'cb_result' }],
       buildArgs([Arg.collection(off.map((e) => buildArgs([Arg.ref(e.oid)])))]), c.serviceOid('Transport'));

@@ -119,7 +119,8 @@ export class RoonConnection implements Transport {
 
       socket.on('data', (data: Buffer) => {
         if (this.established) {
-          this.dataHandler(data);
+          // A malformed frame closes the connection (the reconnect takes over) instead of throwing out of 'data'.
+          try { this.dataHandler(data); } catch (e) { socket.destroy(e as Error); }
           return;
         }
         pending = pending.length === 0 ? data : Buffer.concat([pending, data]);

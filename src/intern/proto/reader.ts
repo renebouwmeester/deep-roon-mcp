@@ -10,9 +10,17 @@ export class BinaryReader {
     return this.buf.length - this.pos;
   }
 
+  /** Never past the end, never backwards (15 Nov 2026): lengths and counts come from the wire. A negative length moved
+   *  the cursor back (a loop that never ends), and reads past the end returned zeros (billions of empty members) — all
+   *  inside the socket's data handler. Now a malformed frame throws, and the connection closes and reconnects. */
+  private need(n: number): void {
+    if (!Number.isInteger(n) || n < 0 || this.pos + n > this.buf.length) throw new RangeError(`malformed frame: ${n} bytes at ${this.pos} of ${this.buf.length}`);
+  }
+
   flexInt(): number {
     let num = 0;
     for (;;) {
+      this.need(1);
       const b = this.buf[this.pos++];
       num = (num << 7) | (b & 0x7f);
       if ((b & 0x80) === 0) break;
@@ -29,6 +37,7 @@ export class BinaryReader {
   flexLong(): bigint {
     let num = 0n;
     for (;;) {
+      this.need(1);
       const b = this.buf[this.pos++];
       num = (num << 7n) | BigInt(b & 0x7f);
       if ((b & 0x80) === 0) break;
@@ -41,10 +50,12 @@ export class BinaryReader {
   }
 
   boolean(): boolean {
+    this.need(1);
     return this.buf[this.pos++] !== 0;
   }
 
   bytes(n: number): Buffer {
+    this.need(n);
     const b = Buffer.from(this.buf.subarray(this.pos, this.pos + n));
     this.pos += n;
     return b;
@@ -55,12 +66,14 @@ export class BinaryReader {
   }
 
   double(): number {
+    this.need(8);
     const v = Buffer.from(this.buf.subarray(this.pos, this.pos + 8)).readDoubleLE(0);
     this.pos += 8;
     return v;
   }
 
   float(): number {
+    this.need(4);
     const v = Buffer.from(this.buf.subarray(this.pos, this.pos + 4)).readFloatLE(0);
     this.pos += 4;
     return v;
@@ -84,6 +97,7 @@ export class BinaryReader {
   string(): string | null {
     const len = this.integer();
     if (len < 0) return null;
+    this.need(len);
     const s = Buffer.from(this.buf.subarray(this.pos, this.pos + len)).toString('utf8');
     this.pos += len;
     return s;

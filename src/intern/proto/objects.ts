@@ -70,6 +70,8 @@ export class ObjectGraph {
     const id = r.flexInt();
     const name = r.string() ?? '';
     const count = r.flexInt();
+    // Every member takes at least two bytes: a count beyond what's left is a malformed frame, not a type (15 Nov 2026).
+    if (count > r.remaining / 2) throw new RangeError(`malformed frame: type ${name} claims ${count} members, ${r.remaining} bytes left`);
     const members: TypeMember[] = [];
     for (let i = 0; i < count; i++) {
       const mname = r.string() ?? '';

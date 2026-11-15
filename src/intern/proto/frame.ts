@@ -52,6 +52,9 @@ export function encodeResponse(rid: number, body: Uint8Array, isFinal = true): B
  * Handles TCP coalescing and splitting (a frame may span multiple reads, and
  * one read may contain several frames).
  */
+/** The largest frame body we accept; Roon's largest real answers (a full library page, artwork) are far below. */
+const MAX_FRAME = 64 * 1024 * 1024;
+
 export class FrameParser {
   private buf: Buffer = Buffer.alloc(0);
 
@@ -106,6 +109,8 @@ export class FrameParser {
     const lenR = flex(pos);
     if (!lenR) return null;
     const [bodyLen, bodyStart] = lenR;
+    // A ceiling (15 Nov 2026): a declared length of up to 4 GB was buffered until memory ran out.
+    if (bodyLen > MAX_FRAME) throw new RangeError(`malformed frame: body of ${bodyLen} bytes`);
     if (u.length < bodyStart + bodyLen) return null; // body incomplete; wait
 
     const frame: Frame = {

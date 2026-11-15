@@ -24,6 +24,7 @@ import RoonApiTransport from 'node-roon-api-transport';
 import { version } from '../../package.json';
 import { log } from './log';
 import { RoonError, Target } from './errors';
+import { pickByName } from './namematch';
 
 function configDir(): string {
   if (process.platform === 'darwin') return path.join(os.homedir(), 'Library', 'Application Support', 'deep-roon-mcp');
@@ -56,7 +57,16 @@ let open = false;                     // a websocket to the Core is open (or ope
 /** Connects to the Core's extension API once at the start (so Deep Roon MCP shows up in Roon to be enabled); later
  *  only on demand (paired()). */
 export function startOfficial(target: Target): void {
-  if (started) return;
+  if (started) {
+    // The Core came back at another address (15 Nov 2026: a reboot with a new DHCP lease) — follow it; before this, every
+    // tool said "isn't enabled in Roon" until the process restarted.
+    if (core && (core.host !== target.host || core.port !== target.port)) {
+      log(`the Core moved to ${target.host}:${target.port} — following it`);
+      core = target;
+      if (!transport) { open = false; connect(); }
+    }
+    return;
+  }
   started = true;
   core = target;
   roon = new RoonApi({
@@ -111,6 +121,8 @@ function connect(): void {
   });
 }
 
+/** Does the Core answer where we think it is? (session.ts asks before it searches again.) */
+export const coreReachable = (ms = 3000): Promise<boolean> => reachable(ms);
 /** Does the Core answer on its port? A plain TCP knock, nothing more. */
 function reachable(ms = 3000): Promise<boolean> {
   return new Promise((resolve) => {
@@ -165,9 +177,7 @@ export async function officialReady(ms = 4000): Promise<void> {
 
 /** A zone by (part of) its name, as the official API knows it. */
 export function officialZone(name: string): OfficialZone | undefined {
-  const want = name.toLowerCase(), all = officialZones();
-  return all.find((z) => z.display_name.toLowerCase() === want) ?? all.find((z) => z.display_name.toLowerCase().split(' + ').includes(want))
-    ?? all.find((z) => z.display_name.toLowerCase().includes(want));
+  return pickByName(officialZones(), name, (z) => z.display_name);
 }
 
 /** Absolute volume on every output of a zone that has one, in that zone's own scale; or mute / unmute. */
@@ -179,12 +189,17 @@ export async function setVolume(name: string, change: { value?: number; mute?: b
   const outs = z.outputs.filter((o) => o.volume);
   if (!outs.length) throw new RoonError(`${z.display_name} has a fixed volume (Roon can't change it)`, 'invalid');
   const call = (fn: (cb: (err: unknown) => void) => void) => new Promise<void>((res, rej) => fn((err) => (err ? rej(new RoonError(`Roon refused: ${err}`)) : res())));
+  // A level outside an output's own scale is refused, not clamped (15 Nov 2026): 30 on a dB scale (−64…0) became 0 dB —
+  // full volume — and the tool said ok. Checked for every output before anything changes.
+  if (change.value !== undefined) {
+    const buiten = outs.filter((o) => o.volume!.type !== 'incremental' && (change.value! < o.volume!.min || change.value! > o.volume!.max));
+    if (buiten.length) throw new RoonError(`${change.value} is outside the volume scale of ${buiten.map((o) => `${o.display_name} (${o.volume!.min}–${o.volume!.max})`).join(', ')}`, 'invalid');
+  }
   for (const o of outs) {
     if (change.value !== undefined) {
       const v = o.volume!;
       if (v.type === 'incremental') throw new RoonError(`${o.display_name} only steps its volume up or down (no level)`, 'invalid');
-      const value = Math.max(v.min, Math.min(v.max, change.value));
-      await call((cb) => t.change_volume(o.output_id, 'absolute', value, cb));
+      await call((cb) => t.change_volume(o.output_id, 'absolute', change.value!, cb));
     }
     if (change.mute !== undefined) await call((cb) => t.mute(o.output_id, change.mute ? 'mute' : 'unmute', cb));
   }

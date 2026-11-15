@@ -185,7 +185,7 @@ ChatGPT on the web can't run a server on your computer — use the desktop app.
 The same settings as environment variables: `ROON_HOST` (the Core's address, empty = find it), `ROON_PROFILE` (a Roon profile
 by name, empty = the first; see below), `DEEP_ROON_TOOLS=essentials`,
 `DEEP_ROON_INTERNAL=off`, `DEEP_ROON_READ_ONLY=library` (nothing changes the library; playing works) or `DEEP_ROON_READ_ONLY=all`
-(Deep Roon only looks: no playing, queueing or zone changes either), `DEEP_ROON_PLAYLIST_EDIT=1` (the playlist edits). Leave out what you don't need. VS Code calls the block `"servers"` instead of `"mcpServers"`.
+(Deep Roon only looks: no playing, queueing or zone changes either; any other value except `off` means `library`), `DEEP_ROON_PLAYLIST_EDIT=1` (the playlist edits). Leave out what you don't need. VS Code calls the block `"servers"` instead of `"mcpServers"`.
 
 Then, once, in Roon: Settings › Extensions › **Enable** next to "Deep Roon MCP". Until then the tools say so.
 
@@ -205,7 +205,8 @@ DEEP_ROON_HTTP=127.0.0.1:9301 npx -y deep-roon-mcp
 
 `DEEP_ROON_HTTP` is `[host:]port`; the host defaults to `127.0.0.1`. There is **no authentication**: keep it on your own
 computer, or put it behind something that has one (a reverse proxy with a key, a private tunnel). Never expose it to
-the internet as it is.
+the internet as it is. Browsers can't use it: a request that carries an `Origin` header is refused, and on a loopback
+address only a loopback `Host` is accepted (so a web page can't reach it through DNS rebinding). Bodies over 4 MB are refused.
 
 ### From source
 

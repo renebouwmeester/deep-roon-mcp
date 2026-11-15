@@ -3,6 +3,7 @@
 // The same tool names as with the internal protocol, so a client sees nothing change but the number of tools.
 import { RoonError, Target } from './errors';
 import { officialReady, officialZone, officialZones, paired, OfficialZone } from './official';
+import { pickByName } from './namematch';
 
 const call = (fn: (cb: (err: unknown) => void) => void) => new Promise<void>((res, rej) => fn((err) => (err ? rej(new RoonError(`Roon refused: ${err}`)) : res())));
 const duration = (s: number) => { const t = Math.round(s), h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), r = t % 60; return h ? `${h}:${String(m).padStart(2, '0')}:${String(r).padStart(2, '0')}` : `${m}:${String(r).padStart(2, '0')}`; };
@@ -83,7 +84,8 @@ export async function group(main: string, join: string[]) {
 export async function ungroup(name: string, only?: string) {
   const { t, z } = await zoneOf(name);
   if (z.outputs.length < 2) throw new RoonError(`${z.display_name} isn't in a group`, 'invalid');
-  const off = only ? z.outputs.filter((o) => o.display_name.toLowerCase().includes(only.toLowerCase())) : z.outputs;
+  const een = only ? pickByName(z.outputs, only, (o) => o.display_name, 'output in this group') : undefined;
+  const off = only ? (een ? [een] : []) : z.outputs;
   if (!off.length) throw new RoonError(`"${only}" isn't in this group`, 'not_found');
   await call((cb) => t.ungroup_outputs(off.map((o) => o.output_id), cb));
   return { ok: true, released: off.map((o) => o.display_name) };

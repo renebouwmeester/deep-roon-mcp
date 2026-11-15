@@ -123,9 +123,9 @@ export function registerLibraryTools(server: McpServer): void {
   server.registerTool('roon_play_mix', {
     title: 'Play a Daily Mix',
     description: 'Play one of today\'s Daily Mixes on a Roon zone (`key` from roon_mixes, or the mix\'s name). `mode`: now (default), next or queue. Only on an explicit request, never as a probe.',
-    inputSchema: { key: z.string(), zone, mode },
+    inputSchema: { key: z.string(), zone, mode, profile },
     annotations: PLAYS,
-  }, ({ key, zone: zn, mode: m }) => run(() => home.playMix(key, zn, m ?? 'now')));
+  }, ({ key, zone: zn, mode: m, profile: p }) => run(() => asProfile(p, () => home.playMix(key, zn, m ?? 'now'))));
 
   // ---- playlists ----
   registerPlaylistEditTools(server);
@@ -186,9 +186,9 @@ export function registerLibraryTools(server: McpServer): void {
   server.registerTool('roon_favorite', {
     title: 'Heart an album or track',
     description: 'Put a heart on an album or a track in Roon, or take it off (`on: false`). The `key` comes from a search, shelf, album or playlist result. Changes the user\'s library: only on an explicit request. Reads the heart back and says if Roon didn\'t change it.',
-    inputSchema: { kind: z.enum(['album', 'track']), key: z.string(), on: z.boolean().optional() },
+    inputSchema: { kind: z.enum(['album', 'track']), key: z.string(), on: z.boolean().optional(), profile },
     annotations: CHANGES,
-  }, ({ kind, key, on }) => run(() => more.favorite(kind, key, on !== false)));
+  }, ({ kind, key, on, profile: p }) => run(() => asProfile(p, () => more.favorite(kind, key, on !== false))));
 
   server.registerTool('roon_listen_later', {
     title: 'Listen Later',
@@ -200,9 +200,9 @@ export function registerLibraryTools(server: McpServer): void {
   server.registerTool('roon_listen_later_set', {
     title: 'Listen Later: add or remove',
     description: 'Put an album or a track on the Listen Later list in Roon, or take it off (`on: false`) — the natural thing to offer after recommending something the user can\'t hear right now. Changes the library: only on an explicit request. Reads it back.',
-    inputSchema: { kind: z.enum(['album', 'track']), key: z.string(), on: z.boolean().optional() },
+    inputSchema: { kind: z.enum(['album', 'track']), key: z.string(), on: z.boolean().optional(), profile },
     annotations: CHANGES,
-  }, ({ kind, key, on }) => run(() => more.listenLaterSet(kind, key, on !== false)));
+  }, ({ kind, key, on, profile: p }) => run(() => asProfile(p, () => more.listenLaterSet(kind, key, on !== false))));
 
   server.registerTool('roon_library_add', {
     title: 'Add to the library',

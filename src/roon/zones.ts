@@ -3,6 +3,7 @@ import { isRef } from '../intern';
 import { withCore, RoonError } from '../core/session';
 import { officialReady, officialZone } from '../core/official';
 import { Any, C, clean, dotnetDate, duration, field, items, localTime, obj, trackArtist } from './graph';
+import { pickByName } from '../core/namematch';
 
 /** The outputs there are now: per name only the current one. A Squeezebox player that reconnects leaves its old output
  *  in the graph; prefer an output whose zone has a track, then one that plays or pauses, then the newest. */
@@ -34,8 +35,7 @@ export function zoneNames(c: C): Map<string, string> {
 /** A zone by (part of) its name. */
 export function findZone(c: C, name: string): { name: string; oid: bigint } {
   const zones = [...zoneNames(c)].map(([oid, n]) => ({ name: n, oid: BigInt(oid) }));
-  const want = String(name).toLowerCase();
-  const z = zones.find((x) => x.name.toLowerCase() === want) ?? zones.find((x) => x.name.toLowerCase().split(' + ').includes(want)) ?? zones.find((x) => x.name.toLowerCase().includes(want));
+  const z = pickByName(zones, name, (x) => x.name);
   if (!z) throw new RoonError(`No Roon zone called "${name}"; Roon has: ${zones.map((x) => x.name).join(', ')}`, 'not_found');
   return z;
 }

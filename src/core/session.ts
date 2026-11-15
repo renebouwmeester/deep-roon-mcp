@@ -8,7 +8,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { RoonClient } from '../intern';
 import { brokerId, coreInfo, findCores } from './discover';
 import { RoonError, Target } from './errors';
-import { paired, startOfficial } from './official';
+import { paired, startOfficial, coreReachable } from './official';
 import { log } from './log';
 
 export { RoonError } from './errors';
@@ -95,13 +95,17 @@ function close(reason: string): void {
 async function open(): Promise<RoonClient> {
   if (client) return client;
   const t = await findTarget();
-  // The user's consent first: the extension enabled in Roon (see official.ts).
-  await paired();
+  // The user's consent first: the extension enabled in Roon (see official.ts). Not paired and the Core gone from its old
+  // address (discovery mode): search again next time, instead of asking the old address forever (15 Nov 2026).
+  try { await paired(); }
+  catch (e) { if (!process.env.ROON_HOST?.trim() && !(await coreReachable())) target = null; throw e; }
   const c = new RoonClient({ host: t.host, port: INTERNAL_PORT, serverBrokerId: brokerId(t.info.coreId), settleMs: 1500 });
   c.conn.onclosed = () => { try { c.remoting.failPending('broker connection closed'); } catch { /* nothing pending */ } if (client === c) { client = null; log('connection closed by the Core'); } };
   const t0 = Date.now();
   try { await c.connect(); }
-  catch (e) { target = null; throw new RoonError(`Can't connect to Roon's internal protocol at ${t.host}:${INTERNAL_PORT} (${(e as Error).message})`, 'unavailable'); }
+  // A handshake that worked but a connect() that didn't (getService timed out): close it, or its 10-s keepalive keeps an
+  // orphan session alive on the Core, one more with every retry (15 Nov 2026).
+  catch (e) { try { c.close(); } catch { /* closed */ } target = null; throw new RoonError(`Can't connect to Roon's internal protocol at ${t.host}:${INTERNAL_PORT} (${(e as Error).message})`, 'unavailable'); }
   client = c;
   log(`connected to the Core in ${Date.now() - t0} ms — ${c.graph.objects.size} objects`);
   if (onFirstConnect) { const f = onFirstConnect; onFirstConnect = null; setTimeout(() => { f().catch(() => {}); }, 0); }

@@ -9,6 +9,7 @@ import { C, Any, field, obj, wait } from './graph';
 import { playlistKey } from './tidal';
 import { findTracks } from './library';
 import { allPlaylists } from './more';
+import { readOnlyMode } from '../core/readonly';
 
 // Roon's sparse objects omit default false values. Accept that default only for a declared bool,
 // after snapshotOn has validated the full native-playlist identity and membership.
@@ -34,8 +35,7 @@ export function revisionOf(key: string, name: string, entries: Pick<Entry, 'id' 
 /** The opt-in: '1' from the environment, 'true' from Claude Desktop's setting (0.5.7). */
 export const playlistEditOn = () => ['1', 'true', 'on', 'yes'].includes((process.env.DEEP_ROON_PLAYLIST_EDIT ?? '').trim().toLowerCase());
 function enabled() {
-  const ro = (process.env.DEEP_ROON_READ_ONLY ?? '').trim().toLowerCase();
-  if (ro && !['off', '0', 'false', 'no'].includes(ro)) invalid('Playlist editing is disabled by DEEP_ROON_READ_ONLY.');
+  if (readOnlyMode() !== 'off') invalid('Playlist editing is disabled by DEEP_ROON_READ_ONLY.');
   if (!playlistEditOn()) invalid('Playlist editing is experimental and disabled; see docs/playlist-editing.md.');
 }
 
