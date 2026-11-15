@@ -1,6 +1,7 @@
 // The self-test: a few reads through the internal protocol, each one standing for a group of tools. Read-only.
 import type { Check } from '../core/status';
 import * as lib from './library';
+import * as focus from './focus';
 
 async function timed(name: string, affects: string, f: () => Promise<string | undefined>): Promise<Check> {
   const t0 = Date.now();
@@ -11,14 +12,21 @@ async function timed(name: string, affects: string, f: () => Promise<string | un
 export async function runSelfTest(): Promise<Check[]> {
   const out: Check[] = [];
   let albumKey: string | undefined;
+  // The probe comes from the library itself (issue #3, 15 Nov 2026): a fixed name ("Miles Davis") found nothing on a
+  // local-only library without a streaming service, and the self-test called search broken while it worked.
   out.push(await timed('search', 'roon_search and everything that starts from a key', async () => {
-    const r = await lib.search('Miles Davis', 5, 'album');
-    albumKey = (r.rows[0] as { key?: string } | undefined)?.key;
-    if (!r.rows.length) throw new Error('no results for a search that always has some');
-    return `${r.rows.length} albums`;
+    const first = (await focus.library({}, 'added', false, 1, 0)).rows[0] as { title?: string; key?: string } | undefined;
+    if (!first?.title) {
+      albumKey = undefined;
+      return 'nothing to search for (an empty library) — not tested';
+    }
+    const r = await lib.search(first.title, 5, 'album');
+    albumKey = (r.rows[0] as { key?: string } | undefined)?.key ?? first.key;
+    if (!r.rows.length) throw new Error(`no results for "${first.title}", an album in this library`);
+    return `${r.rows.length} album${r.rows.length === 1 ? '' : 's'} for "${first.title}"`;
   }));
   out.push(await timed('album page', 'roon_album, roon_review, roon_versions, roon_similar', async () => {
-    if (!albumKey) throw new Error('no album to open (search failed)');
+    if (!albumKey) return 'no album to open (an empty library) — not tested';
     const a = await lib.album(albumKey, false);
     if (!a.tracks?.length) throw new Error('an album without tracks');
     return `${a.tracks.length} tracks`;
