@@ -40,7 +40,7 @@ Version 0.5: sixty-eight tools (sixty with a read-only library; seventy-two with
 | `roon_zones` | Roon's zones and groups |
 | `roon_now_playing` | What plays in each zone, with the volume |
 | `roon_waveform` | The waveform of what plays in a zone, as Roon draws it in its seek bar (local files, and streams once played) |
-| `roon_queue` | A zone's queue, numbered (1 is what plays) |
+| `roon_queue` | A zone's queue, numbered (1 is what plays), each row with its `item` id |
 | `roon_cover` | The cover of what plays, as an image |
 | `roon_history` | Roon's play history, newest first |
 | `roon_top` | Most played albums, artists or tracks over your whole history |
@@ -76,7 +76,7 @@ Version 0.5: sixty-eight tools (sixty with a read-only library; seventy-two with
 | `roon_seek` | A position in the playing track |
 | `roon_volume` | A zone's volume, mute |
 | `roon_settings` | Shuffle, repeat, Roon Radio |
-| `roon_queue_jump`, `roon_queue_remove`, `roon_queue_move` | Jump to an item of the queue, take items out, move one before or after another |
+| `roon_queue_jump`, `roon_queue_remove`, `roon_queue_move` | Jump to an item of the queue, take items out, move one before or after another — by the `item` from `roon_queue`, so a track that ended in between doesn't shift the target |
 | `roon_queue_clear` | Clear what comes after the playing track (or everything) |
 | `roon_transfer` | Move what plays, with its queue, to another zone |
 | `roon_group`, `roon_ungroup` | Group zones, and undo it |

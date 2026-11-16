@@ -80,24 +80,26 @@ export function registerControlTools(server: McpServer, internal = true): void {
 
   reg('roon_queue_jump', {
     title: 'Jump in the queue',
-    description: 'Play an item of the zone\'s queue now (`n` as roon_queue numbers them: 1 is what plays, 2 the next …); what came before it is done. Only on an explicit request.',
-    inputSchema: { zone, n: z.number().int().min(1) },
+    description: 'Play an item of the zone\'s queue now (`n` as roon_queue numbers them: 1 is what plays, 2 the next …); what came before it is done. Pass the row\'s `item` from roon_queue too: positions shift when a track ends, the item doesn\'t. Only on an explicit request.',
+    inputSchema: { zone, n: z.number().int().min(1), item: z.string().optional().describe('The row\'s `item` from roon_queue — finds that item even if the positions moved on, and refuses if it is gone.') },
     annotations: PLAYS,
-  }, ({ zone: zn, n }) => run(() => ctl.queueJump(zn, n)));
+  }, ({ zone: zn, n, item }) => run(() => ctl.queueJump(zn, n, item)));
 
   reg('roon_queue_remove', {
     title: 'Remove from the queue',
-    description: 'Take items out of the zone\'s queue, by their numbers from roon_queue (`ns`, e.g. [3, 4]). Only on an explicit request.',
-    inputSchema: { zone, ns: z.array(z.number().int().min(2)).min(1).max(100).describe('Positions from roon_queue (2 and up: 1 is what plays).') },
+    description: 'Take items out of the zone\'s queue, by their numbers from roon_queue (`ns`, e.g. [3, 4]) — and preferably their `items` too: positions shift when a track ends, the items don\'t. Only on an explicit request.',
+    inputSchema: { zone, ns: z.array(z.number().int().min(2)).min(1).max(100).describe('Positions from roon_queue (2 and up: 1 is what plays).'),
+      items: z.array(z.string()).max(100).optional().describe('The rows\' `item` from roon_queue: exactly these are removed, and nothing if one is gone.') },
     annotations: CHANGES_QUEUE,
-  }, ({ zone: zn, ns }) => run(() => ctl.queueRemove(zn, ns)));
+  }, ({ zone: zn, ns, items }) => run(() => ctl.queueRemove(zn, ns, items)));
 
   reg('roon_queue_move', {
     title: 'Move in the queue',
-    description: 'Move an item of the zone\'s queue next to another: `n` goes `before` or `after` item `to` (numbers from roon_queue; 1 is what plays). Only on an explicit request.',
-    inputSchema: { zone, n: z.number().int().min(2), to: z.number().int().min(2), where: z.enum(['before', 'after']).optional().describe('before (default) or after item `to`.') },
+    description: 'Move an item of the zone\'s queue next to another: `n` goes `before` or `after` item `to` (numbers from roon_queue; 1 is what plays). Pass `item` and `to_item` from roon_queue too: positions shift when a track ends, items don\'t. Only on an explicit request.',
+    inputSchema: { zone, n: z.number().int().min(2), to: z.number().int().min(2), where: z.enum(['before', 'after']).optional().describe('before (default) or after item `to`.'),
+      item: z.string().optional().describe('The `item` of row n from roon_queue.'), to_item: z.string().optional().describe('The `item` of row `to` from roon_queue.') },
     annotations: CHANGES_QUEUE,
-  }, ({ zone: zn, n, to, where }) => run(() => ctl.queueMove(zn, n, to, where ?? 'before')));
+  }, ({ zone: zn, n, to, where, item, to_item }) => run(() => ctl.queueMove(zn, n, to, where ?? 'before', item, to_item)));
 
   reg('roon_queue_clear', {
     title: 'Clear the queue',

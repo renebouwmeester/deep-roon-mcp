@@ -192,19 +192,31 @@ function queueRow(c: C, oid: bigint): Any {
   const img = imageKey(c, al) ?? imageKey(c, tr); if (img) r.image = img;
   return r;
 }
-/** The queue item at position n (1 = what plays now, as roon_queue numbers them). */
-async function queueItemAt(c: C, zoneName: string, n: number) {
+/** An item of the queue by its `item` id from roon_queue (stable while it stays in the queue), else by position. A track that
+ *  ended since roon_queue moved every position by one — the id still finds the item meant, and an item that is gone (played or
+ *  removed) is refused instead of touching another. */
+function pick(refs: bigint[], at: number, n: number, item: string | undefined, zone: string): bigint {
+  if (item !== undefined) {
+    const i = refs.findIndex((o) => String(o) === item);
+    if (i < at) throw new RoonError(`That item is no longer in the queue of ${zone} (it played or was removed) — read roon_queue again`, 'invalid');
+    return refs[i];
+  }
+  const oid = refs[at + n - 1];
+  if (oid === undefined) throw new RoonError(`The queue of ${zone} has no item ${n} (${Math.max(0, refs.length - at)} from here)`, 'invalid');
+  return oid;
+}
+/** The queue item at position n (1 = what plays now, as roon_queue numbers them), or by its `item` id. */
+async function queueItemAt(c: C, zoneName: string, n: number, item?: string) {
   const { z, q } = queueOf(c, zoneName);
   const refs = await queueItems(c, q);
   const at = Math.max(0, field(c.graph.getObject(q.oid), 'CurrentItemIndex') ?? 0);
-  const oid = refs[at + n - 1];
-  if (oid === undefined) throw new RoonError(`The queue of ${z.name} has no item ${n} (${Math.max(0, refs.length - at)} from here)`, 'invalid');
+  const oid = pick(refs, at, n, item, z.name);
   return { z, q, oid, refs, at };
 }
 /** Jump to an item of the queue (Queue::PlayFromHere): it plays, what came before it is done. */
-export async function queueJump(zoneName: string, n: number) {
+export async function queueJump(zoneName: string, n: number, item?: string) {
   const r = await withCore(async (c) => {
-    const { z, q, oid } = await queueItemAt(c, zoneName, n);
+    const { z, q, oid } = await queueItemAt(c, zoneName, n, item);
     c.remoting.callMethodNoReply(q.oid, formatMethodSignature('Queue', 'PlayFromHere', [{ type: 'TransportItem', name: 'item' }]), buildArgs([Arg.ref(oid)]));
     log(`queue_jump: ${z.name} → item ${n}`);
     return { zone: z.name, n };
@@ -212,12 +224,15 @@ export async function queueJump(zoneName: string, n: number) {
   return { ok: true, ...r, ...(await started(r.zone, PRIORITY['now'])) };
 }
 /** Take items out of the queue (Queue::RemoveItems), by their positions from roon_queue. */
-export async function queueRemove(zoneName: string, ns: number[]) {
+export async function queueRemove(zoneName: string, ns: number[], items?: string[]) {
   return withCore(async (c) => {
     const { z, q } = queueOf(c, zoneName);
     const refs = await queueItems(c, q);
     const at = Math.max(0, field(c.graph.getObject(q.oid), 'CurrentItemIndex') ?? 0);
-    const oids = [...new Set(ns)].map((n) => refs[at + n - 1]).filter((o): o is bigint => o !== undefined);
+    // With item ids (from roon_queue): exactly those items, and none at all if one is gone — not a neighbour by position.
+    const oids = items?.length
+      ? [...new Set(items.map((it) => pick(refs, at, 0, it, z.name)))].filter((o) => o !== refs[at])
+      : [...new Set(ns)].map((n) => refs[at + n - 1]).filter((o): o is bigint => o !== undefined);
     if (!oids.length) throw new RoonError('No such items in the queue', 'invalid');
     c.remoting.callMethodNoReply(q.oid, formatMethodSignature('Queue', 'RemoveItems', [{ type: 'IEnumerable<TransportItem>', name: 'items' }]), buildArgs([Arg.collection(oids.map((o) => buildArgs([Arg.ref(o)])))]));
     log(`queue_remove: ${z.name} − ${oids.length} item(s)`);
@@ -230,11 +245,11 @@ export async function queueRemove(zoneName: string, ns: number[]) {
  *  InsertionPoint, measured 13 Oct 2026 on the Mu-so's queue: 0 = the start (before what plays — the item leaves the
  *  view), 1 = the end, 2 = after the relative item, 3 = before it. */
 const INSERTION = { before: 3, after: 2 };
-export async function queueMove(zoneName: string, n: number, to: number, where: 'before' | 'after') {
+export async function queueMove(zoneName: string, n: number, to: number, where: 'before' | 'after', item?: string, toItem?: string) {
   return withCore(async (c) => {
-    const { z, q, oid, refs, at } = await queueItemAt(c, zoneName, n);
-    const rel = refs[at + to - 1];
-    if (rel === undefined || to === n) throw new RoonError(`The queue of ${z.name} has no item ${to} to move next to`, 'invalid');
+    const { z, q, oid, refs, at } = await queueItemAt(c, zoneName, n, item);
+    const rel = toItem !== undefined ? pick(refs, at, to, toItem, z.name) : refs[at + to - 1];
+    if (rel === undefined || rel === oid) throw new RoonError(`The queue of ${z.name} has no item ${to} to move next to`, 'invalid');
     const point = INSERTION[where];
     const res = await c.call('Queue', 'MoveItems',
       [{ type: 'IEnumerable<TransportItem>', name: 'items' }, { type: 'InsertionPoint', name: 'insertionpoint' }, { type: 'TransportItem', name: 'relative_to_item' }, { type: 'ResultCallback', name: 'cb_done' }],
@@ -244,7 +259,8 @@ export async function queueMove(zoneName: string, n: number, to: number, where: 
     await wait(300);
     const after = await queueItems(c, q);
     const now = after.indexOf(oid) - at + 1;
-    return { ok: true, zone: z.name, moved: n, now_at: now > 0 ? now : undefined };
+    // Where it really stood (with an `item`, n may be from an older roon_queue).
+    return { ok: true, zone: z.name, moved: refs.indexOf(oid) - at + 1, now_at: now > 0 ? now : undefined };
   });
 }
 export async function queue(zoneName: string, limit: number) {
@@ -255,7 +271,8 @@ export async function queue(zoneName: string, limit: number) {
     const view = refs.slice(at, at + Math.min(Math.max(1, limit), 200));
     const end = Date.now() + 2500;   // the items arrive after the answer
     while (Date.now() < end && view.some((oid) => queueRow(c, oid).title === null)) await wait(50);
-    return { zone: z.name, left: Math.max(0, refs.length - at), rows: view.map((oid, i) => ({ n: i + 1, now: i === 0 || undefined, ...queueRow(c, oid) })) };
+    // `item`: the id of this place in the queue — stable while it stays there; jump, remove and move take it (DR10).
+    return { zone: z.name, left: Math.max(0, refs.length - at), rows: view.map((oid, i) => ({ n: i + 1, now: i === 0 || undefined, item: String(oid), ...queueRow(c, oid) })) };
   });
 }
 /** Clears what comes after the playing track (Queue::RemoveItems); `everything` clears the whole queue (RemoveAll). */
