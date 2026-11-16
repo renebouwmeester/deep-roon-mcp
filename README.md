@@ -22,7 +22,7 @@ server of its own and sends nothing anywhere else. What you ask goes to your MCP
 
 ## Status
 
-Version 0.5: sixty-four tools (fifty-eight with a read-only library; sixty-eight with playlist editing on). Qobuz, TIDAL or both — whatever is signed in on your Core.
+Version 0.5: sixty-eight tools (sixty with a read-only library; seventy-two with playlist editing on). Qobuz, TIDAL or both — whatever is signed in on your Core.
 
 **Reading** — changes nothing in Roon:
 
@@ -57,6 +57,8 @@ Version 0.5: sixty-four tools (fifty-eight with a read-only library; sixty-eight
 | `roon_tidal_playlists` | TIDAL's playlists: its editorial shelves, by genre or mood, and your own TIDAL mixes |
 | `roon_favorites` | Albums with a heart in Roon, or your Qobuz or TIDAL favourites |
 | `roon_listen_later` | Your Listen Later list |
+| `roon_tags` | Your tags: name, key, smart or not |
+| `roon_album_tags` | The tags of one album |
 | `roon_versions` | Other versions of an album: remasters, hi-res, in your library and streaming |
 | `roon_similar` | More like this, for an album or an artist |
 | `roon_signal_path` | Roon's signal path for what plays: is it bit-perfect, what happens on the way |
@@ -87,11 +89,11 @@ Version 0.5: sixty-four tools (fifty-eight with a read-only library; sixty-eight
 
 **Changing your library or sound** — only on your request; each one reads the result back and says if Roon didn't follow.
 
-> **A word of care.** These six tools write into your Core's library and settings through Roon's *internal* protocol —
+> **A word of care.** These eight tools write into your Core's library and settings through Roon's *internal* protocol —
 > the same wiring Roon's own apps use, but not an API Roon Labs supports for others. Deep Roon is careful with it (one
-> change at a time, read back, nothing in bulk), but a Roon update can change that wiring under it. **Keep a recent backup
+> change at a time, read back; only tagging takes a list of albums, and asks for `confirm`), but a Roon update can change that wiring under it. **Keep a recent backup
 > of your Roon database** (Roon › Settings › Backups) before you let an assistant change things — and if you only want to
-> ask and listen, switch on **Read-only library** below: then these six tools aren't there at all.
+> ask and listen, switch on **Read-only library** below: then these eight tools aren't there at all.
 
 
 | Tool | What it does |
@@ -99,6 +101,8 @@ Version 0.5: sixty-four tools (fifty-eight with a read-only library; sixty-eight
 | `roon_favorite` | A heart on an album or track, or off |
 | `roon_listen_later_set` | On or off the Listen Later list |
 | `roon_library_add` | A Qobuz or TIDAL album into your library |
+| `roon_tag_albums` | Albums into a tag (or out of it); `create` makes the tag — you see the list first, then `confirm` |
+| `roon_tag_delete` | A tag away (its albums stay), with `confirm` |
 | `roon_playlist_create` | A new playlist from tracks |
 | `roon_dsp_set` | MUSE on or off, one part on or off, or a preset |
 | `roon_radio_favorite` | A station into My Live Radio, or out of it |

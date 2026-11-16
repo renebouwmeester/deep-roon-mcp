@@ -9,6 +9,7 @@ import * as more from '../roon/more';
 import * as dev from '../roon/devices';
 import * as rd from '../roon/radio';
 import * as tidal from '../roon/tidal';
+import * as tg from '../roon/tags';
 import { run } from './run';
 import { asProfile } from '../core/session';
 import { registerPlaylistEditTools } from './playlist-edit';
@@ -203,6 +204,36 @@ export function registerLibraryTools(server: McpServer): void {
     inputSchema: { kind: z.enum(['album', 'track']), key: z.string(), on: z.boolean().optional(), profile },
     annotations: CHANGES,
   }, ({ kind, key, on, profile: p }) => run(() => asProfile(p, () => more.listenLaterSet(kind, key, on !== false))));
+
+  // ---- tags (16 Nov 2026) ----
+  server.registerTool('roon_tags', {
+    title: 'Tags',
+    description: 'Roon\'s tags for the profile: name, `key`, how many items, and whether it is a `smart tag` (filled by Roon\'s rules, not editable). For "which tags do I have". The tags of one album: roon_album_tags.',
+    inputSchema: { profile },
+    annotations: READ,
+  }, ({ profile: p }) => run(() => asProfile(p, () => tg.tags())));
+
+  server.registerTool('roon_album_tags', {
+    title: 'Tags of an album',
+    description: 'The tags an album (by album `key`) carries in Roon.',
+    inputSchema: { key: z.string().describe('An album key.'), profile },
+    annotations: READ,
+  }, ({ key, profile: p }) => run(() => asProfile(p, () => tg.albumTags(key))));
+
+  server.registerTool('roon_tag_albums', {
+    title: 'Tag albums',
+    description: 'Put albums (album `keys`, up to 500) into a Roon tag by its `name`, or take them out with `remove: true`. `create: true` makes the tag when none has that name. Changes the library: first show the user the list of albums and the tag, and pass `confirm: true` only after they agreed. Smart tags can\'t be edited. Every album is read back.',
+    inputSchema: { name: z.string(), keys: z.array(z.string()).min(1).max(500), remove: z.boolean().optional(), create: z.boolean().optional(),
+                   confirm: z.boolean().describe('true only after the user agreed to these albums and this tag.'), profile },
+    annotations: CHANGES,
+  }, ({ name, keys, remove, create, confirm, profile: p }) => run(() => asProfile(p, () => tg.tagAlbums(name, keys, { remove, create, confirm: confirm === true }))));
+
+  server.registerTool('roon_tag_delete', {
+    title: 'Delete a tag',
+    description: 'Delete a Roon tag by its `name` (the albums and tracks in it stay in the library). Can\'t be undone: only on an explicit request, and `confirm: true` only after the user agreed.',
+    inputSchema: { name: z.string(), confirm: z.boolean().describe('true only after the user agreed.'), profile },
+    annotations: CHANGES,
+  }, ({ name, confirm, profile: p }) => run(() => asProfile(p, () => tg.deleteTag(name, confirm === true))));
 
   server.registerTool('roon_library_add', {
     title: 'Add to the library',

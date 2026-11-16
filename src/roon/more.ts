@@ -16,14 +16,14 @@ import { currentEndpoints, findZone, zoneNames } from './zones';
 import { How, PRIORITY, outputsOf, playParams, started } from './control';
 
 // The Profile object of the profile in use (7 Nov 2026: was the first one, whatever ROON_PROFILE or `profile` chose).
-const profileObject = (c: C) => {
+export const profileObject = (c: C) => {
   const id = c.profile();
   const all = [...c.graph.objects.values()].filter((o) => o.typeName.endsWith('.Profile'));
   const p = all.find((o) => { const v = field(o, 'ProfileId'); return Buffer.isBuffer(v) && v.equals(id); }) ?? all[0];
   if (!p) throw new RoonError('Roon gave no profile');
   return p;
 };
-const decoded = (c: C, payload: Buffer) => (payload.length ? c.graph.decodeReturnValue(Uint8Array.from(payload)) : null);
+export const decoded = (c: C, payload: Buffer) => (payload.length ? c.graph.decodeReturnValue(Uint8Array.from(payload)) : null);
 
 // ---- playlists ----
 const PLAYLIST_KIND: Record<number, string> = { 1: 'itunes', 5: 'roon', 6: 'roon (read-only)', 10: 'TIDAL', 11: 'file', 12: 'qobuz', 13: 'roon editorial', 15: 'smart' };
@@ -125,7 +125,7 @@ export async function favorites(source: 'roon' | 'qobuz' | 'tidal', limit: numbe
 }
 
 /** Re-reads one album or track from the Core (a fresh object), for the read-back after a change. */
-async function reread(c: C, kind: 'album' | 'track', key: string): Promise<Any> {
+export async function reread(c: C, kind: 'album' | 'track', key: string): Promise<Any> {
   const method = kind === 'album' ? 'GetAlbumLite' : 'GetTrackLites';
   const res = kind === 'album'
     ? await short(c.call('Library', method, [{ type: 'long', name: 'albumid' }, { type: 'ResultCallback<AlbumLite>', name: 'cb_result' }], buildArgs([Arg.long(BigInt(key))]), c.serviceOid('Library')))
