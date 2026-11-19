@@ -18,6 +18,7 @@ export interface Filters {
   album_type?: string; exclude_album_type?: string; bootleg?: boolean;   // 22 Oct 2026: Focus' Album Type (main, single, ep …) and bootlegs
   storage?: string;   // where the albums live: "tidal", "qobuz" or "local" — matched against the Locations of the library
   hidden?: 'include' | 'only';   // 29 Oct 2026, Stacks: the albums Roon hides (mostly the lesser copy of a duplicate) — also, or only those
+  identified?: boolean;   // 19 Nov 2026, forum (J): Roon's Identified / Unidentified filter — false lists the unidentified albums
 }
 interface Member { name: string; propType: number; value: Buffer }
 /** "main release", "EP", "singles" … → Roon's AlbumType number (-1: unknown name). */
@@ -145,6 +146,7 @@ async function focusMembers(c: C, f: Filters, people: ('artist' | 'composer' | '
   if (f.compilation === true) m.push(yes('RequireIsCompilation')); else if (f.compilation === false) m.push(yes('ExcludeIsCompilation'));
   if (f.picks) m.push(yes('RequireIsPick'));
   if (f.bootleg === true) m.push(yes('RequireIsBootleg')); else if (f.bootleg === false) m.push(yes('ExcludeIsBootleg'));
+  if (f.identified === true) m.push(yes('RequireIsIdentified')); else if (f.identified === false) m.push(yes('ExcludeIsIdentified'));
   for (const [arg, member] of [[f.album_type, 'RequireTypes'], [f.exclude_album_type, 'ExcludeTypes']] as const) {
     if (!arg) continue;
     const want = names(arg).map((x) => albumTypeOf(x));

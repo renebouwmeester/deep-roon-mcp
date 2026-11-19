@@ -31,7 +31,7 @@ Version 0.5: sixty-eight tools (sixty with a read-only library; seventy-two with
 | `roon_search` | Your library, Qobuz and TIDAL at once: albums (with format), artists, tracks — each says where it's from |
 | `roon_new` | Qobuz's shelves (new, qobuzissimes, press awards, top, trending, ideal discography) or TIDAL's (new, recommended, top, rising, masters; albums or tracks) — by genre |
 | `roon_genres` | Qobuz's genres and their ids, or TIDAL's genres and moods |
-| `roon_album` | An album's page: tracks, release dates, label, barcode, credits |
+| `roon_album` | An album's page: tracks, release dates, label, barcode, credits, whether Roon identified it, discs, the tags in the files |
 | `roon_track_files` | Where your own files are: per track of an album, an artist or a list of tracks, the file path as the Core sees it (and duplicates) — Roon's export data |
 | `roon_review` | The review Roon shows, in full, with its author |
 | `roon_bio` | The biography Roon shows, in full, with related artists |
@@ -45,7 +45,7 @@ Version 0.5: sixty-eight tools (sixty with a read-only library; seventy-two with
 | `roon_history` | Roon's play history, newest first |
 | `roon_top` | Most played albums, artists or tracks over your whole history |
 | `roon_profiles` | The Roon profiles, and the one Deep Roon uses |
-| `roon_library` | Your library with Roon's Focus: stars, genre, label, artist, composer, producer, years, hi-res, live … sorted any way |
+| `roon_library` | Your library with Roon's Focus: stars, genre, label, artist, composer, producer, years, hi-res, live, identified … sorted any way |
 | `roon_focus` | The Focus panel: what your library (or part of it) is made of, with counts |
 | `roon_tracks`, `roon_artists` | Focus on tracks and artists (and composers) |
 | `roon_works`, `roon_work` | Compositions, and one work with its description and your recordings of it |

@@ -182,7 +182,7 @@ export async function fullAlbum(c: C, al: Any): Promise<Any> {
 const CREDIT_KIND: Record<number, string> = { 1: 'composition', 2: 'conductor', 3: 'main artist', 4: 'performance', 5: 'ensemble', 6: 'production' };
 
 /** An album's page: the album, its facts, its main artists (with a key for the discography) and its tracks with keys. */
-export async function album(key: string, withCredits: boolean) {
+export async function album(key: string, withCredits: boolean, withFileTags = false) {
   return withCore(async (c) => {
     const al = await findAlbum(c, key);
     // The tracks come after the full album; if that fails, the light list.
@@ -221,7 +221,45 @@ export async function album(key: string, withCredits: boolean) {
     const main = items(c, field(al, 'MainPerformers')).filter((p) => field(p, 'Name'));
     if (main.length) out.artists = main.map((p) => ({ key: String(field(p, 'PerformerId') ?? ''), name: field(p, 'Name') }));
     if (seconds) out.length = duration(seconds);
+    // The disc count (19 Nov 2026, forum (J): "whether Roon treated a folder as one multi-disc album or as several") — always,
+    // also 1; the disc per track only when there are more.
+    out.discs = new Set(raw.map((t) => field(t, 'MediaNumber') ?? 1)).size;
     out.tracks = tracks;
+    // The tags in the files (19 Nov 2026, forum (J): ROONALBUMTAG / ROONTRACKTAG per track): Library::GetTrackExportInfoForAlbums
+    // → TrackExportInfo.FileTags, (name, value) per tag as the file has them. Local files only; streaming albums have none.
+    if (withFileTags) {
+      const res = await short(c.call('Library', 'GetTrackExportInfoForAlbums', [{ type: 'IEnumerable<AlbumBase>', name: 'albums' }, { type: 'ResultCallback<IList<TrackExportInfo>>', name: 'cb_result' }],
+        buildArgs([Arg.collection([buildArgs([Arg.ref(al.oid)])])]), library(c)), 8000);
+      // The answer is an IList of structs inline (measured 19 Nov 2026: not graph objects — the path is in the payload itself): the
+      // length, the count, then each TrackExportInfo read as a value, like the Focus histograms.
+      const infos: Any[] = [];
+      if (res?.success && res.payload.length > 2) {
+        const r = new BinaryReader(Uint8Array.from(res.payload)); r.integer(); const n = r.flexInt();
+        const graph = c.graph as Any;
+        for (let i = 0; i < n && r.remaining > 0; i++) infos.push(graph.readValue(r, 23));
+      }
+      await untilLoaded(c, infos.map((e) => field(e, 'Track')).filter(isRef), 2500);
+      // FileTags comes as the bytes of an IList<Tuple<string,string>>: the count, then per tuple a byte array that holds the name and
+      // the value as two strings (measured 19 Nov 2026: \x05TITLE\tHoneylake).
+      const tagsOf = (raw: Any): Any => {
+        const out: Any = {};
+        if (!Buffer.isBuffer(raw) || !raw.length) return out;
+        try {
+          const r = new BinaryReader(Uint8Array.from(raw)); const n = r.flexInt();
+          for (let i = 0; i < n && r.remaining > 0; i++) {
+            const blob = r.byteArray(); if (!blob) continue;
+            const t = new BinaryReader(Uint8Array.from(blob)); const k = t.string(), val = t.string();
+            if (k) out[k] = out[k] !== undefined ? ([] as Any[]).concat(out[k], val) : val;
+          }
+        } catch { /* a form we don't know: no tags rather than wrong ones */ }
+        return out;
+      };
+      const byRef = new Map<string, Any>();
+      // By TrackId: the export's Track is another object than the album's track rows (measured: other refs, same id).
+      for (const e of infos) { const id = field(obj(c, field(e, 'Track')), 'TrackId') ?? field(e, 'TrackId'); if (id != null) byRef.set(String(id), tagsOf(field(e, 'FileTags'))); }
+      for (const r of tracks) { const tg = byRef.get(r.key); if (tg && Object.keys(tg).length) r.file_tags = tg; }
+      if (!infos.length) out.file_tags = 'none: a streaming album, or Roon has no files for it';
+    }
     // The facts of the album page: labels and genres by value in the album, the rest on the full album.
     const A = isRef(full) ? c.graph.getObject(full.$ref) : null;
     const g = strings(c, field(al, 'Genres')); if (g.length) out.genres = g;
@@ -230,6 +268,18 @@ export async function album(key: string, withCredits: boolean) {
     const version = field(al, 'Version'); if (typeof version === 'string' && version) out.version = version;
     for (const [k, name] of [['CatalogNumber', 'catalogue_number'], ['ProductCode', 'barcode'], ['Country', 'country']]) { const w = field(A, k); if (typeof w === 'string' && w) out[name] = w; }
     for (const [k, name] of [['IsLive', 'live'], ['IsCompilation', 'compilation'], ['IsPick', 'roon_pick']]) if (field(al, k) === true) out[name] = true;
+    // Identification (19 Nov 2026, forum (J): "the release Roon matched"): Roon's own id of the metadata album it matched (and
+    // AllMusic's, when that's the source). A MusicBrainz id isn't in what the protocol returns.
+    out.identified = field(al, 'IsIdentified') === true;
+    if (A && field(A, 'IsIdentificationInProgress') === true) out.identifying = true;
+    const ext = field(A, 'ExternalAlbumId');
+    if (Buffer.isBuffer(ext)) {
+      out.roon_album_id = ext.toString('hex');
+      // A metadata id as text after a two-byte kind (measured 19 Nov 2026: 79 00 + "MW0003887740") — AllMusic's album id, the one in
+      // its URLs (…-mw0003887740). Roon's own ids are binary (3e 01 …) and stay hex only.
+      const rest = ext.subarray(2).toString('latin1');
+      if (ext.length > 4 && /^MW\d{6,}$/.test(rest)) out.allmusic_id = rest.toLowerCase();
+    }
     if (withCredits && A) {
       // Album.Credits: {Role, Performer, Type} — grouped by role, in Roon's order. Roon's own data, as Roon has it.
       const byRole = new Map<string, Any>();

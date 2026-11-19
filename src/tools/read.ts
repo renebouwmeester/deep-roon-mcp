@@ -47,10 +47,11 @@ export function registerReadTools(server: McpServer, internal = true): void {
 
   reg('roon_album', {
     title: 'Album page',
-    description: 'One album in Roon, by its `key` (from roon_search, roon_new, roon_artist): the album with year, format, label and whether it is in the library, its genres, release date (and the date of this edition), barcode and — when Roon has them — catalogue number and country, its main artist(s) with a `key` for `roon_artist` / `roon_bio`, and every track with its own `key`. A streaming album that is also in the library comes back as the library copy (its key may differ; both work). `credits: true` adds who played, produced, engineered and wrote, grouped by role — Roon\'s own data.',
-    inputSchema: { key: z.string().describe('An album key.'), credits: z.boolean().optional() },
+    description: 'One album in Roon, by its `key` (from roon_search, roon_new, roon_artist): the album with year, format, label and whether it is in the library, its genres, release date (and the date of this edition), barcode and — when Roon has them — catalogue number and country, whether Roon identified it (`identified`, with Roon\'s own `roon_album_id`, and `allmusic_id` when Roon matched it to AllMusic), the number of `discs` (the disc per track when there are more), its main artist(s) with a `key` for `roon_artist` / `roon_bio`, and every track with its own `key`. A streaming album that is also in the library comes back as the library copy (its key may differ; both work). `credits: true` adds who played, produced, engineered and wrote, grouped by role — Roon\'s own data. `file_tags: true` adds the tags as they are in each local file, per track (ROONALBUMTAG, ROONTRACKTAG …).',
+    inputSchema: { key: z.string().describe('An album key.'), credits: z.boolean().optional(),
+      file_tags: z.boolean().optional().describe('Adds the tags in each local file, per track.') },
     annotations: READ,
-  }, ({ key, credits }) => run(() => lib.album(key, credits === true)));
+  }, ({ key, credits, file_tags }) => run(() => lib.album(key, credits === true, file_tags === true)));
 
   reg('roon_track_files', {
     title: 'File paths',
