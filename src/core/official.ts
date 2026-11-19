@@ -83,6 +83,7 @@ export function startOfficial(target: Target): void {
       transport = core.services.RoonApiTransport ?? Object.entries(core.services ?? {}).find(([k]) => k.startsWith('RoonApiTransport'))?.[1];
       if (!transport) { log('paired, but the Core offers no transport service'); return; }
       log(`paired with ${core.display_name} (Roon › Settings › Extensions)`);
+      onPairedHook?.(String(core.display_version ?? ''));
       transport.subscribe_zones((cmd: string, data: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
         if (cmd === 'Subscribed') {
           zones.clear(); for (const z of data.zones ?? []) zones.set(z.zone_id, z);
@@ -102,6 +103,11 @@ export function startOfficial(target: Target): void {
   roon.init_services({ required_services: [RoonApiTransport] });
   connect();
 }
+/** Called with the Core's version at every pairing — also after a Core restart or update (19 Nov 2026: build 1723 → 1726 at
+ *  15:31, roon_status kept saying 1723 and its self-test from before until Deep Roon itself restarted). */
+let onPairedHook: ((version: string) => void) | null = null;
+export function onCorePaired(f: (version: string) => void): void { onPairedHook = f; }
+
 function connect(): void {
   if (open || !roon || !core) return;
   open = true;

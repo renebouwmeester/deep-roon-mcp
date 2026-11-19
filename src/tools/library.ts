@@ -38,6 +38,7 @@ const FOCUS = {
   album_type: z.string().optional().describe('Roon\'s album type, comma-separated: main, single, ep, compilation, soundtrack, show, other.'),
   exclude_album_type: z.string().optional().describe('Album types to leave out, e.g. "single, ep".'),
   bootleg: z.boolean().optional(),
+  exclude_producer: z.string().optional().describe('Leave out the albums this producer or engineer worked on, e.g. "Manfred Eicher".'),
   identified: z.boolean().optional().describe('Roon\'s Identified filter: false = the albums Roon could not identify.'),
   played_within_days: days, not_played_within_days: days, added_within_days: days,
 };
@@ -48,7 +49,7 @@ export function registerLibraryTools(server: McpServer): void {
   // ---- Focus ----
   server.registerTool('roon_library', {
     title: 'Library (Focus)',
-    description: 'The user\'s Roon LIBRARY — the albums they own or added — filtered and sorted with Roon\'s Focus. Filters combine freely: `min_stars` (Roon\'s editorial album rating; 5 = only five-star albums — THE tool for "five-star albums in my library"), `genre`, `label`, `artist`, `composer`, `producer`, `year_from` / `year_to`, `hires`, `live`, `compilation`, `picks`, `album_type` / `exclude_album_type` (main, single, ep, compilation, soundtrack, show), `bootleg`, `identified` (false = the albums Roon could not identify), `text`, `favorites`, `played_within_days` / `not_played_within_days` / `added_within_days`. `sort`: artist (default), added, released, most_played, title, popular, random — `random` is the way to "pick something from my library"; `ascending` flips a sort. `total` counts all matches; `offset` pages. Rows carry stars, year, format and a `key` for roon_play / roon_album. `matched` says which artist, composer or producer a name became.',
+    description: 'The user\'s Roon LIBRARY — the albums they own or added — filtered and sorted with Roon\'s Focus. Filters combine freely: `min_stars` (Roon\'s editorial album rating; 5 = only five-star albums — THE tool for "five-star albums in my library"), `genre`, `label`, `artist`, `composer`, `producer` (and `exclude_producer`: "ECM albums Manfred Eicher did NOT produce"), `year_from` / `year_to`, `hires`, `live`, `compilation`, `picks`, `album_type` / `exclude_album_type` (main, single, ep, compilation, soundtrack, show), `bootleg`, `identified` (false = the albums Roon could not identify), `text`, `favorites`, `played_within_days` / `not_played_within_days` / `added_within_days`. `sort`: artist (default), added, released, most_played, title, popular, random — `random` is the way to "pick something from my library"; `ascending` flips a sort. `total` counts all matches; `offset` pages. Rows carry stars, year, format and a `key` for roon_play / roon_album. `matched` says which artist, composer or producer a name became.',
     inputSchema: { ...FOCUS, sort: z.enum(['artist', 'added', 'released', 'most_played', 'title', 'popular', 'random']).optional(), ascending: z.boolean().optional(), limit: limit(100, 50), offset },
     annotations: READ,
   }, ({ sort, ascending, limit: n, offset: o, ...f }) => run(() => fc.library(filters(f), sort, ascending, n ?? 50, o ?? 0)));

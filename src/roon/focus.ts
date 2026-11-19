@@ -18,7 +18,8 @@ export interface Filters {
   album_type?: string; exclude_album_type?: string; bootleg?: boolean;   // 22 Oct 2026: Focus' Album Type (main, single, ep …) and bootlegs
   storage?: string;   // where the albums live: "tidal", "qobuz" or "local" — matched against the Locations of the library
   hidden?: 'include' | 'only';   // 29 Oct 2026, Stacks: the albums Roon hides (mostly the lesser copy of a duplicate) — also, or only those
-  identified?: boolean;   // 19 Nov 2026, forum (J): Roon's Identified / Unidentified filter — false lists the unidentified albums
+  identified?: boolean;
+  exclude_producer?: string;   // 19 Nov 2026, René: "which ECM albums did Manfred Eicher NOT produce" — Roon's ExcludeProduction   // 19 Nov 2026, forum (J): Roon's Identified / Unidentified filter — false lists the unidentified albums
 }
 interface Member { name: string; propType: number; value: Buffer }
 /** "main release", "EP", "singles" … → Roon's AlbumType number (-1: unknown name). */
@@ -168,6 +169,15 @@ async function focusMembers(c: C, f: Filters, people: ('artist' | 'composer' | '
       m.push({ name: member, propType: 23, value: refList([hit.ref]) });
       matched[p] = hit.name;
     }
+  }
+  // Leaving a producer out (ExcludeProduction): looked up the same way, in the producers of the whole library.
+  if (f.exclude_producer && people.includes('producer')) {
+    const want = f.exclude_producer;
+    const l = await panelList(c, await albumInfo(c, []), 'producers', want);
+    const hit = l.find((x) => String(x.name).toLowerCase() === want.toLowerCase()) ?? l[0];
+    if (!hit || hit.ref === null) throw new RoonError(`No producer "${want}" in the library`, 'not_found');
+    m.push({ name: 'ExcludeProduction', propType: 23, value: refList([hit.ref]) });
+    matched.excluded_producer = hit.name;
   }
   return { members: m, matched: Object.keys(matched).length ? matched : undefined };
 }

@@ -19,6 +19,8 @@ export function selfTest(run: () => Promise<Check[]>): Promise<void> {
   return checking;
 }
 export const selfTestResults = (): Check[] | null => checks;
+/** Forget the self-test (a Core update can break the internal protocol): it runs again at the next roon_status. */
+export function resetSelfTest(): void { checks = null; checking = null; }
 
 // ---- a newer version on GitHub ----
 let newer: { version: string; url: string } | null = null;

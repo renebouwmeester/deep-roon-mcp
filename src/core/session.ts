@@ -8,8 +8,9 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { RoonClient } from '../intern';
 import { brokerId, coreInfo, findCores } from './discover';
 import { RoonError, Target } from './errors';
-import { paired, startOfficial, coreReachable } from './official';
+import { paired, startOfficial, coreReachable, onCorePaired } from './official';
 import { log } from './log';
+import { resetSelfTest } from './status';
 
 export { RoonError } from './errors';
 
@@ -49,6 +50,14 @@ export function profileInUse(c: RoonClient): string | undefined {
   const id = c.profile();
   return profilesOf(c).find((p) => p.id.equals(id))?.name;
 }
+
+// A new version at a pairing (the Core restarted after an update): the known version follows, and the self-test runs again.
+onCorePaired((v) => {
+  if (!target || !v || target.info.version === v) return;
+  log(`the Core is now ${v} (was ${target.info.version}) — the self-test runs again`);
+  target.info.version = v;
+  resetSelfTest();
+});
 
 /** What's known now, without connecting. */
 export const knownTarget = (): Target | null => target;
