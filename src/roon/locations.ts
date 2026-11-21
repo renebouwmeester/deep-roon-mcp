@@ -14,9 +14,10 @@ export function chooseLocations(locs: LocationInfo[], wanted: string): bigint[] 
   return locs.filter((l) => l.displayName.trim().toLowerCase() === want).map((l) => l.ref);
 }
 
-/** How Focus names a location: the name Roon shows, else its kind. */
+/** How Focus names a location: TIDAL and Qobuz by their service (as before, not Roon's "TIDAL Library" / "qobuz Library"),
+ *  a local folder by the name Roon shows for it, else "Local". */
 export function locationName(l: LocationInfo): string {
-  if (l.displayName.trim()) return l.displayName.trim();
   const kind = streaming(l);
-  return kind === 'tidal' ? 'TIDAL' : kind === 'qobuz' ? 'Qobuz' : 'Local';
+  if (kind) return kind === 'tidal' ? 'TIDAL' : 'Qobuz';
+  return l.displayName.trim() || 'Local';
 }

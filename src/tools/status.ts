@@ -3,7 +3,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { version } from '../../package.json';
 import { findTarget } from '../core/session';
 import { isPaired, paired as waitPaired } from '../core/official';
-import { selfTest, selfTestResults, updateInfo, selfTestSettling } from '../core/status';
+import { selfTest, selfTestResults, updateInfo, updateLine, selfTestSettling } from '../core/status';
 import { runSelfTest } from '../roon/selftest';
 import { run } from './run';
 import { z } from 'zod';
@@ -40,7 +40,7 @@ export function registerStatusTool(server: McpServer, internal: boolean): void {
   if (process.env.DEEP_ROON_DEBUG === '1') registerDebugTool(server);
   server.registerTool('roon_status', {
     title: 'Deep Roon MCP status',
-    description: 'How Deep Roon MCP stands: its version (and whether a newer one is out), the Roon Core it talks to, whether it is enabled in Roon (Settings › Extensions), whether Roon\'s internal protocol works, and a self-test of a few reads with the tools each one stands for. Use it when a tool fails, or when the user asks whether everything works.',
+    description: 'How Deep Roon MCP stands: its version (and whether it is up to date or a newer one is out), the Roon Core it talks to, whether it is enabled in Roon (Settings › Extensions), whether Roon\'s internal protocol works, and a self-test of a few reads with the tools each one stands for. Use it when a tool fails, or when the user asks whether everything works.',
     inputSchema: {},
     annotations: { readOnlyHint: true, openWorldHint: false },
   }, () => run(async () => {
@@ -52,7 +52,7 @@ export function registerStatusTool(server: McpServer, internal: boolean): void {
     if (internal && paired && !selfTestResults() && settling === 0) await selfTest(runSelfTest);
     const checks = selfTestResults();
     return {
-      deep_roon_mcp: version, newer_version: updateInfo() ?? undefined,
+      deep_roon_mcp: version, update: updateLine(), newer_version: updateInfo() ?? undefined,
       core, enabled_in_roon: paired || 'not yet: Roon › Settings › Extensions › Enable next to "Deep Roon MCP"',
       internal_protocol: internal ? (checks ? (checks.every((c) => c.ok) ? 'works' : 'partly broken — see self_test')
         : settling > 0 ? `the Core just updated — the self-test runs again in about ${Math.ceil(settling / 60)} min, once Roon has settled`

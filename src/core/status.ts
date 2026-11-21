@@ -30,22 +30,30 @@ export const selfTestSettling = (): number => Math.max(0, Math.ceil((resetAt + S
 
 // ---- a newer version on GitHub ----
 let newer: { version: string; url: string } | null = null;
+/** What the check found: 'latest' = this is the newest release; 'unknown' = no answer (offline, rate-limited); 'off' = switched off. */
+let checked: 'latest' | 'newer' | 'unknown' | 'off' = 'unknown';
 let told = false;
 const parse = (v: string) => v.replace(/^v/, '').split('.').map((n) => parseInt(n, 10) || 0);
 const isNewer = (a: string, b: string) => { const x = parse(a), y = parse(b); for (let i = 0; i < 3; i++) { if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) > (y[i] ?? 0); } return false; };
 
 /** Looks once, at the start, for a newer release on GitHub (no account, no data sent beyond the request itself). */
 export async function checkForUpdate(): Promise<void> {
-  if (process.env.DEEP_ROON_NO_UPDATE_CHECK === '1') return;
+  if (process.env.DEEP_ROON_NO_UPDATE_CHECK === '1') { checked = 'off'; return; }
   try {
     const r = await fetch('https://api.github.com/repos/renebouwmeester/deep-roon-mcp/releases/latest', {
       headers: { 'User-Agent': `deep-roon-mcp/${version}`, Accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(5000) });
     if (!r.ok) return;
     const j = await r.json() as { tag_name?: string; html_url?: string };
-    if (j.tag_name && isNewer(j.tag_name, version)) { newer = { version: j.tag_name.replace(/^v/, ''), url: j.html_url ?? '' }; log(`a newer version is out: ${newer.version}`); }
+    if (j.tag_name && isNewer(j.tag_name, version)) { newer = { version: j.tag_name.replace(/^v/, ''), url: j.html_url ?? '' }; checked = 'newer'; log(`a newer version is out: ${newer.version}`); }
+    else if (j.tag_name) checked = 'latest';
   } catch { /* offline, rate-limited: nothing to say */ }
 }
 export const updateInfo = () => newer;
+/** One line for roon_status (jbarr76, 21 Nov 2026: "The status report didn't say whether a newer version is out" — no news has to be news too). */
+export function updateLine(): string {
+  if (newer) return `${newer.version} is out (this is ${version}): ${newer.url}`;
+  return checked === 'latest' ? 'up to date' : checked === 'off' ? 'update check switched off (DEEP_ROON_NO_UPDATE_CHECK)' : 'could not check GitHub for a newer version';
+}
 /** The line for the first answer after a newer version was found — once per run. */
 export function updateNotice(): string | null {
   if (!newer || told) return null;

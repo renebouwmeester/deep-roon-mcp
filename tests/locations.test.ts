@@ -28,8 +28,9 @@ test('a storage location is picked by the name Roon shows for it, ignoring case,
   assert.deepEqual(chooseLocations(library, 'Lossless Hi-Res'), []);
 });
 
-test('Focus names each location by the name Roon shows, falling back to its kind', () => {
-  assert.deepEqual(library.map(locationName), ['Lossless', 'Classical', 'Hi-Res', 'TIDAL Library', 'DSD']);
+test('Focus names a local folder by the name Roon shows, and TIDAL/Qobuz by their service', () => {
+  assert.deepEqual(library.map(locationName), ['Lossless', 'Classical', 'Hi-Res', 'TIDAL', 'DSD']);
   assert.equal(locationName({ ref: 9n, name: '9', displayName: '', category: 100 }), 'Local');
   assert.equal(locationName({ ref: 9n, name: 'qobuz Library', displayName: '', category: 400 }), 'Qobuz');
+  assert.equal(locationName({ ref: 9n, name: 'qobuz Library', displayName: 'qobuz Library', category: 400 }), 'Qobuz');
 });
