@@ -9,6 +9,7 @@ import { structSchema } from '../intern/generated/struct-schemas';
 import { withCore, RoonError } from '../core/session';
 import { ALBUM_TYPES, Any, C, albumRow, duration, field, imageKeys, items, obj, resultRow, short, untilField, untilLoaded, wait, yearOf } from './graph';
 import { choose, entityText } from './library';
+import { chooseLocations, locationName, type LocationInfo } from './locations';
 
 export interface Filters {
   min_stars?: number; genre?: string; label?: string; artist?: string; composer?: string; producer?: string;
@@ -16,7 +17,7 @@ export interface Filters {
   text?: string; favorites?: boolean; played_within_days?: number; not_played_within_days?: number; added_within_days?: number;
   sample_rate?: string; bits?: string; mqa?: boolean;   // 13 Oct 2026, Rosso's Focus: "44.1, 96" (kHz), "16, 24"
   album_type?: string; exclude_album_type?: string; bootleg?: boolean;   // 22 Oct 2026: Focus' Album Type (main, single, ep …) and bootlegs
-  storage?: string;   // where the albums live: "tidal", "qobuz" or "local" — matched against the Locations of the library
+  storage?: string;   // where the albums live: "local" (every local folder), "tidal", "qobuz", or a storage location's shown name
   hidden?: 'include' | 'only';   // 29 Oct 2026, Stacks: the albums Roon hides (mostly the lesser copy of a duplicate) — also, or only those
   identified?: boolean;
   exclude_producer?: string;   // 19 Nov 2026, René: "which ECM albums did Manfred Eicher NOT produce" — Roon's ExcludeProduction   // 19 Nov 2026, forum (J): Roon's Identified / Unidentified filter — false lists the unidentified albums
@@ -32,6 +33,10 @@ function albumTypeOf(x: string): number {
 // Values as the criteria structs want them: a length prefix around a list, an int? with its presence byte.
 const intList = (xs: number[]) => { const w = new BinaryWriter().flexInt(xs.length); for (const x of xs) w.integer(x); const b = w.toBuffer(); return new BinaryWriter().integer(b.length).bytes(b).toBuffer(); };
 const textList = (xs: string[]) => { const w = new BinaryWriter().flexInt(xs.length); for (const x of xs) w.string(x); const b = w.toBuffer(); return new BinaryWriter().integer(b.length).bytes(b).toBuffer(); };
+const locationInfo = (c: C, v: Any): LocationInfo => {
+  const o = obj(c, v);
+  return { ref: v.$ref, name: String(field(o, 'Name') ?? ''), displayName: String(field(o, 'DisplayName') ?? ''), category: Number(field(o, 'Category') ?? 0) };
+};
 const refList = (xs: bigint[]) => { const w = new BinaryWriter().flexInt(xs.length); for (const x of xs) w.long(x); const b = w.toBuffer(); return new BinaryWriter().integer(b.length).bytes(b).toBuffer(); };
 const maybeInt = (n: number) => new BinaryWriter().boolean(true).integer(n).toBuffer();
 const dateValue = (y: number, m: number, d: number) => { const b = new BinaryWriter().flexInt((y << 16) | (m << 8) | d).toBuffer(); return new BinaryWriter().integer(b.length).bytes(b).toBuffer(); };
@@ -136,12 +141,12 @@ async function focusMembers(c: C, f: Filters, people: ('artist' | 'composer' | '
     // The Location objects come from the panel of the whole library ("TIDAL Library", "qobuz Library", and a number for
     // local files — measured 13 Oct 2026); the criteria want the objects.
     const whole = await albumInfo(c, []);
-    const want = f.storage.toLowerCase();
     const locs = items(c, field(whole, 'Locations')).map((it) => field(it, 'Value')).filter(isRef);
     await untilLoaded(c, locs, 1500);
-    const hit = locs.find((v) => { const n = String(field(obj(c, v), 'Name') ?? '').toLowerCase(); return want === 'local' ? !/tidal|qobuz/.test(n) : n.includes(want); });
-    if (!hit) throw new RoonError(`No "${f.storage}" in this library's locations`, 'not_found');
-    m.push({ name: 'RequireLocations', propType: 23, value: refList([hit.$ref]) });
+    const known = locs.map((v) => locationInfo(c, v));
+    const hits = chooseLocations(known, f.storage);
+    if (!hits.length) throw new RoonError(`No "${f.storage}" in this library's locations: ${known.map(locationName).join(', ')}`, 'not_found');
+    m.push({ name: 'RequireLocations', propType: 23, value: refList(hits) });
   }
   if (f.live === true) m.push(yes('RequireIsLive')); else if (f.live === false) m.push(yes('ExcludeIsLive'));
   if (f.compilation === true) m.push(yes('RequireIsCompilation')); else if (f.compilation === false) m.push(yes('ExcludeIsCompilation'));
@@ -250,7 +255,7 @@ export async function focus(f: Filters, more: string | undefined, search: string
       // Roon's album types (main release, single, EP, soundtrack …); the default, main, comes without a value.
       album_types: hist('Types').map((x) => ({ type: ALBUM_TYPES[typeof x.w === 'number' ? x.w : 0] ?? 'unknown', albums: x.n })).sort((a, b) => b.albums - a.albums),
       // Raw histograms, to be named once measured (13 Oct 2026): where the albums live, and their file formats.
-      storage: hist('Locations').map((x) => { const n = isRef(x.w) ? String(field(obj(c, x.w), 'Name') ?? '') : String(x.w); return { name: /tidal/i.test(n) ? 'TIDAL' : /qobuz/i.test(n) ? 'Qobuz' : 'Local', albums: x.n }; }),
+      storage: hist('Locations').map((x) => ({ name: isRef(x.w) ? locationName(locationInfo(c, x.w)) : String(x.w), albums: x.n })),
     };
   });
 }
