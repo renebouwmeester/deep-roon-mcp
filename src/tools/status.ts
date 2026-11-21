@@ -3,7 +3,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { version } from '../../package.json';
 import { findTarget } from '../core/session';
 import { isPaired, paired as waitPaired } from '../core/official';
-import { selfTest, selfTestResults, updateInfo } from '../core/status';
+import { selfTest, selfTestResults, updateInfo, selfTestSettling } from '../core/status';
 import { runSelfTest } from '../roon/selftest';
 import { run } from './run';
 import { z } from 'zod';
@@ -48,12 +48,15 @@ export function registerStatusTool(server: McpServer, internal: boolean): void {
     const core = 'error' in t ? { error: t.error } : { name: t.info.name, version: t.info.version, address: t.host };
     if (!('error' in t)) await waitPaired(5000).catch(() => null);   // a fresh start pairs within a second or two
     const paired = isPaired();
-    if (internal && paired && !selfTestResults()) await selfTest(runSelfTest);
+    const settling = selfTestSettling();
+    if (internal && paired && !selfTestResults() && settling === 0) await selfTest(runSelfTest);
     const checks = selfTestResults();
     return {
       deep_roon_mcp: version, newer_version: updateInfo() ?? undefined,
       core, enabled_in_roon: paired || 'not yet: Roon › Settings › Extensions › Enable next to "Deep Roon MCP"',
-      internal_protocol: internal ? (checks ? (checks.every((c) => c.ok) ? 'works' : 'partly broken — see self_test') : 'not tested yet') : 'switched off (only the official API)',
+      internal_protocol: internal ? (checks ? (checks.every((c) => c.ok) ? 'works' : 'partly broken — see self_test')
+        : settling > 0 ? `the Core just updated — the self-test runs again in about ${Math.ceil(settling / 60)} min, once Roon has settled`
+        : 'not tested yet') : 'switched off (only the official API)',
       self_test: checks ?? undefined,
     };
   }));

@@ -59,6 +59,11 @@ export class RemotingClient {
   private nextMethodId = 1;
   private definedMethods = new Set<number>();
   private pending = new Map<number, Pending>();
+  /** More patience for the library's heavy questions (issue #4, 21 Nov 2026): on a library of 322,000 tracks a search took
+   *  9 s, and right after a Core update — while Roon rebuilds its index — more than the 15 s every other call gets. A
+   *  dead connection is still noticed in 15 s on everything else. */
+  private slowTimeoutMs = 30000
+  private static slow = /UnifiedSearch|Virtual\w*Query|RetainPage|AlbumQueryInfo|Histogram/
 
   /** Called with every inbound request frame (server push). */
   onPush: (frame: Frame) => void = () => {};
@@ -120,13 +125,13 @@ export class RemotingClient {
   }
 
   /** Low-level: send a request that expects a response; resolves with the final frame. */
-  private request(cmd: number, body: Buffer): Promise<Frame> {
+  private request(cmd: number, body: Buffer, timeoutMs = this.requestTimeoutMs): Promise<Frame> {
     const rid = this.nextRid();
     return new Promise<Frame>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(rid);
         reject(new Error(`remoting request ${rid} (cmd ${cmd}) timed out`));
-      }, this.requestTimeoutMs);
+      }, timeoutMs);
       this.pending.set(rid, { chunks: [], resolve, reject, timer });
       try {
         this.transport.send(encodeRequest(cmd, body, rid));
@@ -172,7 +177,7 @@ export class RemotingClient {
     const mid = this.methodId(signature);
     this.ensureDefined(mid, signature);
     const body = new BinaryWriter().long(objectId).flexInt(mid).bytes(args).toBuffer();
-    const frame = await this.request(Cmd.CALL, body);
+    const frame = await this.request(Cmd.CALL, body, RemotingClient.slow.test(signature) ? this.slowTimeoutMs : this.requestTimeoutMs);
     return this.parseCallResult(frame.body);
   }
 

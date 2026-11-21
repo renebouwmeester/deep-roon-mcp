@@ -5,7 +5,12 @@ import * as focus from './focus';
 
 async function timed(name: string, affects: string, f: () => Promise<string | undefined>): Promise<Check> {
   const t0 = Date.now();
-  try { const detail = await f(); return { name, ok: true, ms: Date.now() - t0, detail, affects }; }
+  try {
+    const detail = await f(), ms = Date.now() - t0;
+    // Slow isn't broken (issue #4): a large library, or a Core that just updated, can take many seconds and still work.
+    const slow = ms > 8000 ? ` — works, but slow (${Math.round(ms / 1000)} s): a large library, or a Core that just updated` : '';
+    return { name, ok: true, ms, detail: detail === undefined ? (slow ? slow.slice(3) : undefined) : detail + slow, affects };
+  }
   catch (e) { return { name, ok: false, ms: Date.now() - t0, detail: (e as Error).message, affects }; }
 }
 

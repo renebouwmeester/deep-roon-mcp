@@ -19,8 +19,14 @@ export function selfTest(run: () => Promise<Check[]>): Promise<void> {
   return checking;
 }
 export const selfTestResults = (): Check[] | null => checks;
-/** Forget the self-test (a Core update can break the internal protocol): it runs again at the next roon_status. */
-export function resetSelfTest(): void { checks = null; checking = null; }
+/** Forget the self-test (a Core update can break the internal protocol): it runs again at the next roon_status — but not in
+ *  the first minutes (issue #4, 21 Nov 2026): right after an update the Core rebuilds its search index, and a search that
+ *  takes 9 s on a large library ran past every limit, so the self-test called a working search broken. */
+let resetAt = 0;
+export function resetSelfTest(): void { checks = null; checking = null; resetAt = Date.now(); }
+const SETTLE_MS = 3 * 60 * 1000;
+/** Seconds until the self-test may run again after a Core update (0 = now). */
+export const selfTestSettling = (): number => Math.max(0, Math.ceil((resetAt + SETTLE_MS - Date.now()) / 1000));
 
 // ---- a newer version on GitHub ----
 let newer: { version: string; url: string } | null = null;
