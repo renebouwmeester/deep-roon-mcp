@@ -2,7 +2,8 @@
 import { isRef } from '../intern';
 import { withCore, RoonError } from '../core/session';
 import { officialReady, officialZone } from '../core/official';
-import { Any, C, clean, dotnetDate, duration, field, items, localTime, obj, trackArtist } from './graph';
+import { Any, C, clean, dotnetDate, duration, field, imageKey, items, localTime, obj, trackArtist } from './graph';
+import { fullAlbum } from './library';
 import { pickByName } from '../core/namematch';
 
 /** The outputs there are now: per name only the current one. A Squeezebox player that reconnects leaves its old output
@@ -51,13 +52,44 @@ export async function zones() {
 const STATE: Record<number, string> = { 0: 'playing', 1: 'loading', 2: 'paused', 3: 'stopped' };   // ZoneState; an absent field is 0
 const REPEAT: Record<number, string> = { 1: 'all', 2: 'one' };                                      // LoopMode: Disabled, Loop, LoopOne
 
+/** Disc covers per album (AlbumId → disc number → image key), so a box set costs one GetAlbum per half hour. */
+const discCovers = new Map<string, { at: number; covers: Map<number, string> }>();
+const DISC_COVERS_TTL_MS = 30 * 60 * 1000;
+
+/** The disc a track is on, for an album of more than one disc: number, count, title (Roon's disc title, e.g. "Sessions
+ *  and Demos") and, since Roon 2.7x's per-disc artwork, the disc's own cover as `image` (21 Nov 2026: a four-disc box
+ *  set with a cover per disc; the zone feed's image stays the album's main cover). */
+async function discOf(c: C, tr: Any, al: Any): Promise<Any> {
+  const number = field(tr, 'MediaNumber');
+  const count = field(al, 'MediaCount') ?? field(al, 'MaxMediaNumber');
+  const title = field(tr, 'MediaTitle');
+  if (typeof number !== 'number' || !((typeof count === 'number' && count > 1) || number > 1 || title)) return undefined;
+  const d: Any = { number };
+  if (typeof count === 'number') d.of = count;
+  if (typeof title === 'string' && title) d.title = title;
+  const id = String(field(al, 'AlbumId') ?? al?.oid ?? '');
+  let known = discCovers.get(id);
+  if (!known || Date.now() - known.at > DISC_COVERS_TTL_MS) {
+    const covers = new Map<number, string>();
+    const full = await fullAlbum(c, al).catch(() => null);
+    const fa = obj(c, full);
+    for (const disc of items(c, field(fa, 'Discs'))) {
+      const n = field(disc, 'MediaNumber'), key = imageKey(c, disc);
+      if (typeof n === 'number' && key) covers.set(n, key);
+    }
+    if (full) { known = { at: Date.now(), covers }; discCovers.set(id, known); if (discCovers.size > 100) discCovers.delete(discCovers.keys().next().value!); }
+  }
+  const image = known?.covers.get(number); if (image) d.image = image;
+  return d;
+}
+
 /** What plays per zone: state, track, album, artist, format, position. */
 export async function nowPlaying() {
   await officialReady().catch(() => {});
   return withCore(async (c) => {
     const names = zoneNames(c);
     // Only zones with an output: after a transfer the old zone objects stay in the graph.
-    const out = c.graph.findByType('Zone').filter((z) => names.has(String(z.oid))).map((z) => {
+    const out = await Promise.all(c.graph.findByType('Zone').filter((z) => names.has(String(z.oid))).map(async (z) => {
       const r: Any = { zone: names.get(String(z.oid)), state: STATE[field(z, 'State') ?? 0] ?? String(field(z, 'State')) };
       // The volume, from the official API (the internal graph doesn't carry it).
       const off = officialZone(r.zone);
@@ -90,6 +122,7 @@ export async function nowPlaying() {
         const ak = field(al, 'AlbumId'); if (ak !== undefined && ak !== null) r.album_key = String(ak);
         const f = field(tr, 'Format'); if (f) r.format = f;
         const l = field(tr, 'LengthSeconds'); if (typeof l === 'number') r.length = duration(l);
+        const disc = await discOf(c, tr, al); if (disc) r.disc = disc;
       } else {
         // A stream through Roon's audio input (another app feeding Roon) or a radio station: no track in the graph, but
         // the official API has the lines Roon shows.
@@ -99,7 +132,7 @@ export async function nowPlaying() {
       const pos = field(z, 'SeekPosition'); if (typeof pos === 'number') r.position = duration(pos);
       const left = field(obj(c, field(z, 'Queue')), 'TrackCountRemaining'); if (typeof left === 'number' && !r.source) r.tracks_left_in_queue = left;
       return r;
-    });
+    }));
     return { zones: out };
   });
 }

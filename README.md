@@ -38,7 +38,7 @@ Version 0.5: sixty-eight tools (sixty with a read-only library; seventy-two with
 | `roon_artist` | An artist's discography at Qobuz or TIDAL, oldest first |
 | `roon_status` | How Deep Roon MCP stands: Core, pairing, internal protocol, self-test, newer version |
 | `roon_zones` | Roon's zones and groups |
-| `roon_now_playing` | What plays in each zone, with the volume |
+| `roon_now_playing` | What plays in each zone, with the volume — on a box set also the disc, with its own cover |
 | `roon_waveform` | The waveform of what plays in a zone, as Roon draws it in its seek bar (local files, and streams once played) |
 | `roon_queue` | A zone's queue, numbered (1 is what plays), each row with its `item` id |
 | `roon_cover` | The cover of what plays, as an image |
@@ -246,7 +246,7 @@ status; it holds no secrets).
   aren't interchangeable. Deep Roon reads Roon's internal library, so most keys are internal ones (short, like
   `doicaaaa`): the Core serves them at `http://<core>:9330/image/<key>.jpg`, or scaled at `/image/<key>.300.jpg` (any
   width). The zones (`roon_now_playing`) come from Roon's official extension API, whose keys (long hex) are served at
-  `/api/image/<key>?scale=fit&width=600&height=600`. The URL uses the Core's address as Deep Roon sees it — when Deep
+  `/api/image/<key>?scale=fit&width=600&height=600` — except a box set's `disc.image`, an internal key. The URL uses the Core's address as Deep Roon sees it — when Deep
   Roon runs on the Core's own machine that is `127.0.0.1`; from another device, put the Core's IP there.
 - The log goes to stderr (your MCP client keeps it).
 - At the start it asks GitHub once whether a newer release is out (`DEEP_ROON_NO_UPDATE_CHECK=1` turns that off). Nothing

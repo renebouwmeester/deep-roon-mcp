@@ -105,7 +105,7 @@ export function registerReadTools(server: McpServer, internal = true): void {
 
   reg('roon_now_playing', {
     title: 'Now playing in Roon',
-    description: 'What plays in Roon, per zone: state (playing, loading, paused, stopped), the track with album, artist and format, the position, how many tracks are left in the queue, shuffle, repeat, Roon Radio and a sleep timer. Read this before saying anything about what Roon plays — it changes all the time.',
+    description: 'What plays in Roon, per zone: state (playing, loading, paused, stopped), the track with album, artist and format, on a multi-disc album its `disc` (number, `of`, title and — for box sets with a cover per disc — the disc\'s own cover as `image`), the position, how many tracks are left in the queue, shuffle, repeat, Roon Radio and a sleep timer. Read this before saying anything about what Roon plays — it changes all the time.',
     inputSchema: {},
     annotations: READ,
   }, () => run(() => (internal ? zn.nowPlaying() : off.nowPlaying())));
